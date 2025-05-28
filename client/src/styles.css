@@ -1,0 +1,4 @@
+body { font-family: system-ui, sans-serif; margin: 2rem; }
+button, input, textarea { padding: .6rem 1rem; margin-right: .5rem; }
+img { max-width: 400px; display: block; margin-top: 1rem; }
+.hidden { display:none; }
