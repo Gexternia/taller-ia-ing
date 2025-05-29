@@ -1,5 +1,5 @@
 import express from "express";
-import cors from "cors";                                       // ← Nuevo
+import cors from "cors";                                         // <-- Nuevo
 import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname, join, extname, basename } from "path";
@@ -46,10 +46,10 @@ console.log("   uploads:", UPLOAD_CFG);
 console.log("   outputs:", OUTPUT_CFG);
 
 // 4) Cliente S3 y OpenAI
-const s3     = new S3Client({ region: process.env.AWS_REGION });
+const s3 = new S3Client({ region: process.env.AWS_REGION });
 const openai = new OpenAI({
-  apiKey:        process.env.OPENAI_API_KEY,
-  organization:  process.env.OPENAI_ORG
+  apiKey: process.env.OPENAI_API_KEY,
+  organization: process.env.OPENAI_ORG
 });
 
 // 5) Helpers S3
@@ -63,7 +63,7 @@ async function uploadToS3({ bucket, prefix }, localPath, filename) {
   const Key  = prefix ? `${prefix}/${filename}` : filename;
   console.log(`➡️ Subiendo a S3 ${bucket}/${Key}`);
   await s3.send(new PutObjectCommand({
-    Bucket:      bucket,
+    Bucket: bucket,
     Key,
     Body,
     ContentType: mime.lookup(localPath) || "application/octet-stream"
@@ -94,20 +94,22 @@ function cosineSim(a, b) {
 }
 
 async function chooseBrandRefs(description, k = 10) {
-  const icons  = await listAllIcons();
+  const icons = await listAllIcons();
   const titles = icons.map(i => i.title);
   const { data: embs }    = await openai.embeddings.create({
-    model: "text-embedding-3-small", input: titles
+    model: "text-embedding-3-small",
+    input: titles
   });
   const { data: descEmb } = await openai.embeddings.create({
-    model: "text-embedding-3-small", input: [description]
+    model: "text-embedding-3-small",
+    input: [description]
   });
   const descVec = descEmb[0].embedding;
-  const scored  = embs.map((e, i) => ({
+  const scored = embs.map((e, i) => ({
     ...icons[i],
     score: cosineSim(e.embedding, descVec)
   }));
-  return scored.sort((a,b) => b.score - a.score).slice(0, k);
+  return scored.sort((a, b) => b.score - a.score).slice(0, k);
 }
 
 // 8) Convierte local → Data URL para visión
@@ -119,18 +121,13 @@ async function imageFileToDataURL(fp) {
 
 // 9) Servidor Express
 const app = express();
-
-// ← Aquí habilitamos CORS solo para tu front
-app.use(cors({
-  origin: "https://taller-ia-ing-front.onrender.com"
-}));
-
+app.use(cors());                  // <-- Habilita CORS para todas las rutas
 app.use(express.json());
 
 // Multer temporal
 const storage = multer.diskStorage({
   destination: (_r,_f,cb) => cb(null, UPLOAD_DIR),
-  filename:    (_r,f,cb)  => cb(null, Date.now()+extname(f.originalname))
+  filename:    (_r,f,cb)  => cb(null, Date.now() + extname(f.originalname))
 });
 const upload = multer({ storage });
 
@@ -139,48 +136,48 @@ const upload = multer({ storage });
  */
 app.post("/api/generate", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error:"No image uploaded" });
+    if (!req.file) return res.status(400).json({ error: "No image uploaded" });
     console.log("➡️ /api/generate");
 
     // 1) Extraer descripción
     const vision = await openai.responses.create({
-      model:"gpt-4o-mini",
-      input:[{
-        role:"user",
-        content:[
-          { type:"input_image", image_url: await imageFileToDataURL(req.file.path) },
-          { type:"input_text",  text:"Describe what appears in this image (subjects, objects, details), do not focus on materials, under 600 chars." }
+      model: "gpt-4o-mini",
+      input: [{
+        role: "user",
+        content: [
+          { type: "input_image", image_url: await imageFileToDataURL(req.file.path) },
+          { type: "input_text",  text: "Describe what appears in this image (subjects, objects, details), do not focus on materials, under 600 chars." }
         ]
       }]
     });
-    const msg          = vision.output[0];
-    const description  = Array.isArray(msg.content)
-      ? msg.content.map(c=>c.text||"").join(" ").trim()
-      : typeof msg.content==="string"
+    const msg = vision.output[0];
+    const description = Array.isArray(msg.content)
+      ? msg.content.map(c => c.text || "").join(" ").trim()
+      : typeof msg.content === "string"
         ? msg.content.trim()
-        : msg.content.text?.trim()||"";
+        : msg.content.text?.trim() || "";
     console.log("   ▶ description:", description);
 
     // 2) Elegir referencias
     const refs = await chooseBrandRefs(description, 10);
-    console.log("   ▶ refs:", refs.map(r=>r.title));
+    console.log("   ▶ refs:", refs.map(r => r.title));
 
     // 3) Construir prompt
-    const refTitles = refs.map(r=>`“${r.title}”`).join(", ");
-    const prompt    =
-      `Generate a flat, vector-based icon of ${description} on a transparent background. `+
-      `Follow ING’s illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. `+
-      `Apply accent color #FF6200 sparingly and use secondary palette for contrast. `+
+    const refTitles = refs.map(r => `“${r.title}”`).join(", ");
+    const prompt =
+      `Generate a flat, vector-based icon of ${description} on a transparent background. ` +
+      `Follow ING’s illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
+      `Apply accent color #FF6200 sparingly and use secondary palette for contrast. ` +
       `Match exactly these reference icons: ${refTitles}. Maintain basic shapes, clean colors, avoid extra details.`;
     console.log("   ▶ prompt:", prompt);
 
     // 4) Llamada image_generation
-    const gen  = await openai.responses.create({
-      model:"gpt-4.1-mini",
+    const gen = await openai.responses.create({
+      model: "gpt-4.1-mini",
       input: prompt,
-      tools:[{ type:"image_generation", background:"transparent", size:"auto", quality:"high" }]
+      tools: [{ type: "image_generation", background: "transparent", size: "auto", quality: "high" }]
     });
-    const call = gen.output.find(o=>o.type==="image_generation_call");
+    const call = gen.output.find(o => o.type === "image_generation_call");
     if (!call?.result) throw new Error("No image returned");
     console.log("   ✅ generated");
 
@@ -195,7 +192,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     // 6) Respuesta
     res.json({
       resultUrl:  await signedUrl(OUTPUT_CFG.bucket, s3key),
-      brandRefs:  await Promise.all(refs.map(async r=>({
+      brandRefs:  await Promise.all(refs.map(async r => ({
         title: r.title,
         url:   await signedUrl(BRAND_CFG.bucket, r.key)
       }))),
@@ -214,28 +211,28 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 app.post("/api/iterate", async (req, res) => {
   try {
     const { previousResponseId, action, actionParam } = req.body;
-    if (!previousResponseId) return res.status(400).json({ error:"Missing previousResponseId" });
+    if (!previousResponseId) return res.status(400).json({ error: "Missing previousResponseId" });
     console.log("➡️ /api/iterate", action, actionParam);
 
     // sugerir título
-    if (action==="suggest_title") {
+    if (action === "suggest_title") {
       const tit = await openai.responses.create({
-        model:"gpt-4.1-mini",
+        model: "gpt-4.1-mini",
         previous_response_id: previousResponseId,
-        input:"Suggest a catchy, original title for this illustration."
+        input: "Suggest a catchy, original title for this illustration."
       });
       const out = tit.output[0];
       const sug = Array.isArray(out.content)
-        ? out.content.map(c=>c.text||"").join(" ").trim()
-        : typeof out.content==="string"
+        ? out.content.map(c => c.text || "").join(" ").trim()
+        : typeof out.content === "string"
           ? out.content.trim()
-          : out.content.text?.trim()||"";
+          : out.content.text?.trim() || "";
       return res.json({ suggestedTitle: sug });
     }
 
     // validar título libre
-    if (action==="add_title" && !actionParam) {
-      return res.status(400).json({ error:"add_title requires a text parameter" });
+    if (action === "add_title" && !actionParam) {
+      return res.status(400).json({ error: "add_title requires a text parameter" });
     }
 
     // mapear acciones
@@ -252,12 +249,12 @@ app.post("/api/iterate", async (req, res) => {
 
     // llamada multi-turn
     const it = await openai.responses.create({
-      model:"gpt-4.1-mini",
+      model: "gpt-4.1-mini",
       previous_response_id: previousResponseId,
       input: text,
-      tools:[{ type:"image_generation", background:"transparent", size:"auto", quality:"high" }]
+      tools: [{ type: "image_generation", background: "transparent", size: "auto", quality: "high" }]
     });
-    const call2 = it.output.find(o=>o.type==="image_generation_call");
+    const call2 = it.output.find(o => o.type === "image_generation_call");
     if (!call2?.result) throw new Error("No image returned");
     console.log("   ✅ iteration generated");
 
@@ -286,5 +283,5 @@ app.get("/api/download/:file", (_req, res) =>
 );
 
 // inicia servidor
-const PORT = process.env.PORT||5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on http://localhost:${PORT}`));
