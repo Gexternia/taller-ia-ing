@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";                                       // ← Nuevo
 import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname, join, extname, basename } from "path";
@@ -27,7 +28,9 @@ await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
 // 3) Configuración S3, limpiando cualquier 's3://' del .env
 function parseBucket(envVar) {
-  const raw = (process.env[envVar] || "").replace(/^s3:\/\//, "").replace(/\/+$/, "");
+  const raw = (process.env[envVar] || "")
+    .replace(/^s3:\/\//, "")
+    .replace(/\/+$/, "");
   const [bucket, ...rest] = raw.split("/");
   const prefix = rest.join("/");
   return { bucket, prefix };
@@ -43,10 +46,10 @@ console.log("   uploads:", UPLOAD_CFG);
 console.log("   outputs:", OUTPUT_CFG);
 
 // 4) Cliente S3 y OpenAI
-const s3 = new S3Client({ region: process.env.AWS_REGION });
+const s3     = new S3Client({ region: process.env.AWS_REGION });
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  organization: process.env.OPENAI_ORG
+  apiKey:        process.env.OPENAI_API_KEY,
+  organization:  process.env.OPENAI_ORG
 });
 
 // 5) Helpers S3
@@ -60,7 +63,7 @@ async function uploadToS3({ bucket, prefix }, localPath, filename) {
   const Key  = prefix ? `${prefix}/${filename}` : filename;
   console.log(`➡️ Subiendo a S3 ${bucket}/${Key}`);
   await s3.send(new PutObjectCommand({
-    Bucket: bucket,
+    Bucket:      bucket,
     Key,
     Body,
     ContentType: mime.lookup(localPath) || "application/octet-stream"
@@ -91,12 +94,16 @@ function cosineSim(a, b) {
 }
 
 async function chooseBrandRefs(description, k = 10) {
-  const icons = await listAllIcons();
+  const icons  = await listAllIcons();
   const titles = icons.map(i => i.title);
-  const { data: embs }    = await openai.embeddings.create({ model:"text-embedding-3-small", input: titles });
-  const { data: descEmb } = await openai.embeddings.create({ model:"text-embedding-3-small", input: [description] });
+  const { data: embs }    = await openai.embeddings.create({
+    model: "text-embedding-3-small", input: titles
+  });
+  const { data: descEmb } = await openai.embeddings.create({
+    model: "text-embedding-3-small", input: [description]
+  });
   const descVec = descEmb[0].embedding;
-  const scored = embs.map((e,i) => ({
+  const scored  = embs.map((e, i) => ({
     ...icons[i],
     score: cosineSim(e.embedding, descVec)
   }));
@@ -112,6 +119,12 @@ async function imageFileToDataURL(fp) {
 
 // 9) Servidor Express
 const app = express();
+
+// ← Aquí habilitamos CORS solo para tu front
+app.use(cors({
+  origin: "https://taller-ia-ing-front.onrender.com"
+}));
+
 app.use(express.json());
 
 // Multer temporal
@@ -140,8 +153,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
         ]
       }]
     });
-    const msg = vision.output[0];
-    const description = Array.isArray(msg.content)
+    const msg          = vision.output[0];
+    const description  = Array.isArray(msg.content)
       ? msg.content.map(c=>c.text||"").join(" ").trim()
       : typeof msg.content==="string"
         ? msg.content.trim()
@@ -154,7 +167,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 
     // 3) Construir prompt
     const refTitles = refs.map(r=>`“${r.title}”`).join(", ");
-    const prompt = 
+    const prompt    =
       `Generate a flat, vector-based icon of ${description} on a transparent background. `+
       `Follow ING’s illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. `+
       `Apply accent color #FF6200 sparingly and use secondary palette for contrast. `+
@@ -162,7 +175,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     console.log("   ▶ prompt:", prompt);
 
     // 4) Llamada image_generation
-    const gen = await openai.responses.create({
+    const gen  = await openai.responses.create({
       model:"gpt-4.1-mini",
       input: prompt,
       tools:[{ type:"image_generation", background:"transparent", size:"auto", quality:"high" }]
@@ -249,11 +262,11 @@ app.post("/api/iterate", async (req, res) => {
     console.log("   ✅ iteration generated");
 
     // guardar + subir a outputs
-    const buf2     = Buffer.from(call2.result, "base64");
-    const fname2   = `${Date.now()}.png`;
-    const local2   = join(OUTPUT_DIR, fname2);
+    const buf2   = Buffer.from(call2.result, "base64");
+    const fname2 = `${Date.now()}.png`;
+    const local2 = join(OUTPUT_DIR, fname2);
     await fs.writeFile(local2, buf2);
-    const key2     = await uploadToS3(OUTPUT_CFG, local2, fname2);
+    const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
     res.json({
@@ -275,6 +288,3 @@ app.get("/api/download/:file", (_req, res) =>
 // inicia servidor
 const PORT = process.env.PORT||5000;
 app.listen(PORT, () => console.log(`⚡ API listening on http://localhost:${PORT}`));
-
-
-

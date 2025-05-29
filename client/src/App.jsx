@@ -10,6 +10,7 @@ export default function App() {
   const [brandRefs, setBrandRefs]       = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Lee la URL del backend desde .env
   const API = process.env.REACT_APP_API_URL;
 
   // --- Cámara / archivo -----------------------------------------------------
@@ -198,6 +199,3 @@ export default function App() {
     </>
   );
 }
-
-
-
