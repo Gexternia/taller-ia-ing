@@ -1,0 +1,7 @@
+{
+  "name": "taller-ia-ing",
+  "scripts": {
+    "start": "node server/index.js",
+    "postinstall": "cd client && npm install && npm run build"
+  }
+}
