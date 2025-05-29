@@ -10,12 +10,7 @@ export default function App() {
   const [brandRefs, setBrandRefs]     = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Estados de despliegue de sub-menus
-  const [showColorOpts, setShowColorOpts]   = useState(false);
-  const [showScaleOpts, setShowScaleOpts]   = useState(false);
-  const [showTextOpts, setShowTextOpts]     = useState(false);
-
-  // Cámara o archivo
+  // --- Cámara / archivo -----------------------------------------------------
   async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     videoRef.current.srcObject = stream;
@@ -32,30 +27,38 @@ export default function App() {
     setCaptured(e.target.files[0]);
   }
 
-  // Generación inicial
+  // --- Generación inicial --------------------------------------------------
   async function generate() {
-    if (!captured) return alert("Sube o captura una imagen primero");
+    if (!captured) {
+      alert("Sube o captura una imagen primero");
+      return;
+    }
     setIsGenerating(true);
+    setResultUrl(null);
+    setResponseId(null);
+    setBrandRefs([]);
+
     const form = new FormData();
     form.append("image", captured, "input.png");
+
     const res = await fetch("/api/generate", { method: "POST", body: form });
     const data = await res.json();
-    setResultUrl(data.resultPath);
+
+    setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
     setBrandRefs(data.brandRefs || []);
-    // Oculta menús
-    setShowColorOpts(false);
-    setShowScaleOpts(false);
-    setShowTextOpts(false);
     setIsGenerating(false);
   }
 
-  // Iteraciones
+  // --- Iteraciones ----------------------------------------------------------
   async function iterate(action, param) {
-    if (!responseId) return alert("Primero genera la imagen inicial");
+    if (!responseId) {
+      alert("Primero genera la imagen inicial");
+      return;
+    }
     setIsGenerating(true);
 
-    // Sugerir título
+    // Sugerir título con IA
     if (action === "suggest_title") {
       const res = await fetch("/api/iterate", {
         method: "POST",
@@ -66,66 +69,79 @@ export default function App() {
       const userTitle = window.prompt("¿Te gusta este título? Si quieres editarlo:", suggestedTitle);
       if (userTitle) {
         await iterate("add_title", userTitle);
+      } else {
+        setIsGenerating(false);
       }
-      setIsGenerating(false);
       return;
     }
 
     // Añadir título libre
     if (action === "add_title" && !param) {
       const userTitle = window.prompt("Escribe el título que quieras añadir:");
-      if (!userTitle) { setIsGenerating(false); return; }
+      if (!userTitle) {
+        setIsGenerating(false);
+        return;
+      }
       param = userTitle;
     }
 
-    // Llamada de iteración
+    // Llamada de iteración normal
     const res = await fetch("/api/iterate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ previousResponseId: responseId, action, actionParam: param })
     });
     const data = await res.json();
-    setResultUrl(data.resultPath);
+
+    setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
     setIsGenerating(false);
-
-    // Después de iterar, volvemos a esconder sub-menus
-    setShowColorOpts(false);
-    setShowScaleOpts(false);
-    setShowTextOpts(false);
   }
 
   return (
     <>
       <h1>Taller IA ING – Generador WOW</h1>
 
+      {/* Paso 1: Foto o subida */}
       <h2>1. Haz la foto o súbela</h2>
       <video ref={videoRef} autoPlay className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
       <div>
-        <button onClick={startCamera}>Usar cámara</button>
-        <button onClick={takeShot}>Disparar</button>
-        <input type="file" accept="image/*" onChange={onFile} />
+        <button onClick={startCamera} disabled={isGenerating}>Usar cámara</button>
+        <button onClick={takeShot} disabled={isGenerating}>Disparar</button>
+        <input type="file" accept="image/*" onChange={onFile} disabled={isGenerating}/>
       </div>
 
-      {captured && <img src={URL.createObjectURL(captured)} alt="pre" style={{ maxWidth: 400, margin: 8 }} />}
+      {captured && (
+        <img
+          src={URL.createObjectURL(captured)}
+          alt="previsualización"
+          style={{ maxWidth: 400, margin: 8 }}
+        />
+      )}
 
-      <div style={{ margin: 8 }}>
+      {/* Generar */}
+      <div style={{ margin: "16px 0" }}>
         <button onClick={generate} disabled={isGenerating}>
           {isGenerating ? "Generando..." : "Generar estilo ING"}
         </button>
       </div>
 
+      {/* Paso 2: Mostrar resultado e iteraciones */}
       {resultUrl && (
         <>
           <h2>2. Resultado</h2>
-          <img src={resultUrl} alt="Resultado" style={{ maxWidth: 600 }} />
+          <img
+            src={resultUrl}
+            alt="Resultado"
+            style={{ maxWidth: 600, display: "block", marginBottom: 8 }}
+          />
           <a href={resultUrl} download="resultado_ing.png">Descargar</a>
 
           <h3>Referencias usadas:</h3>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {brandRefs.map(ref => (
-              <div key={ref.filename} style={{ textAlign: "center" }}>
+              <div key={ref.filename || ref.title} style={{ textAlign: "center" }}>
                 <img
                   src={ref.url}
                   alt={ref.title}
@@ -137,103 +153,23 @@ export default function App() {
           </div>
 
           <h3>3. Iteraciones</h3>
-          {isGenerating && <div style={{ marginBottom: 8, fontStyle: "italic" }}>Iterando…</div>}
-          {/* Botones principales */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <button onClick={() => setShowColorOpts(x => !x)} disabled={isGenerating}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => iterate("change_palette", "Orange (#FF6200), Sky (#89D6FD), Maroon (#4D0020), Blush (#F689FD)")} disabled={isGenerating}>
               Modificar colores
             </button>
-            <button onClick={() => setShowScaleOpts(x => !x)} disabled={isGenerating}>
-              Modificar escala
-            </button>
-            <button onClick={() => setShowTextOpts(x => !x)} disabled={isGenerating}>
-              Modificar texto
-            </button>
-            <button onClick={generate} disabled={isGenerating}>
-              Rehacer
-            </button>
+            <button onClick={() => iterate("scale_up")}    disabled={isGenerating}>Aumentar escala</button>
+            <button onClick={() => iterate("scale_down")}  disabled={isGenerating}>Disminuir escala</button>
+            <button onClick={() => iterate("move_left")}   disabled={isGenerating}>Mover izquierda</button>
+            <button onClick={() => iterate("move_right")}  disabled={isGenerating}>Mover derecha</button>
+            <button onClick={() => iterate("add_title")}   disabled={isGenerating}>Añadir título</button>
+            <button onClick={() => iterate("suggest_title")} disabled={isGenerating}>Título con IA</button>
+            <button onClick={generate} disabled={isGenerating}>Rehacer</button>
           </div>
-
-          {/* Sub-menus */}
-          {showColorOpts && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              <button
-                onClick={() =>
-                  iterate(
-                    "change_palette",
-                    "#FF6200,#89D6FD,#4D0020,#F689FD"
-                  )
-                }
-                disabled={isGenerating}
-              >
-                Orange+Sky+Maroon+Blush
-              </button>
-              <button
-                onClick={() =>
-                  iterate(
-                    "change_palette",
-                    "#FF6200,#4D0020,#D40199,#F689FD"
-                  )
-                }
-                disabled={isGenerating}
-              >
-                Orange+Maroon+Raspberry+Blush
-              </button>
-              <button
-                onClick={() =>
-                  iterate(
-                    "change_palette",
-                    "#FF6200,#D40199,#F689FD,#FFE100"
-                  )
-                }
-                disabled={isGenerating}
-              >
-                Orange+Raspberry+Blush+Sun
-              </button>
-              <button
-                onClick={() =>
-                  iterate(
-                    "change_palette",
-                    "#FF6200,#7724FF,#89D6FD,#4D0020"
-                  )
-                }
-                disabled={isGenerating}
-              >
-                Orange+Violet+Sky+Maroon
-              </button>
-            </div>
-          )}
-
-          {showScaleOpts && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              <button onClick={() => iterate("resize_up")} disabled={isGenerating}>
-                Aumentar
-              </button>
-              <button onClick={() => iterate("resize_down")} disabled={isGenerating}>
-                Disminuir
-              </button>
-              <button onClick={() => iterate("move_left")} disabled={isGenerating}>
-                Mover izquierda
-              </button>
-              <button onClick={() => iterate("move_right")} disabled={isGenerating}>
-                Mover derecha
-              </button>
-            </div>
-          )}
-
-          {showTextOpts && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              <button onClick={() => iterate("add_title")} disabled={isGenerating}>
-                Añadir título
-              </button>
-              <button onClick={() => iterate("suggest_title")} disabled={isGenerating}>
-                Título con IA
-              </button>
-            </div>
-          )}
+          {isGenerating && <p style={{ marginTop: 8 }}>Iterando… por favor espera.</p>}
         </>
       )}
     </>
   );
 }
+
 
