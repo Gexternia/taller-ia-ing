@@ -1,5 +1,5 @@
 import express from "express";
-import cors from "cors";                                         // <-- Nuevo
+import cors from "cors";
 import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname, join, extname, basename } from "path";
@@ -95,6 +95,7 @@ function cosineSim(a, b) {
 
 async function chooseBrandRefs(description, k = 10) {
   const icons = await listAllIcons();
+  console.log("   ▶ total icons:", icons.length);
   const titles = icons.map(i => i.title);
   const { data: embs }    = await openai.embeddings.create({
     model: "text-embedding-3-small",
@@ -121,7 +122,7 @@ async function imageFileToDataURL(fp) {
 
 // 9) Servidor Express
 const app = express();
-app.use(cors());                  // <-- Habilita CORS para todas las rutas
+app.use(cors());                 
 app.use(express.json());
 
 // Multer temporal
@@ -136,7 +137,10 @@ const upload = multer({ storage });
  */
 app.post("/api/generate", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No image uploaded" });
+    if (!req.file) {
+      console.warn("❌ /api/generate: no file");
+      return res.status(400).json({ error: "No image uploaded" });
+    }
     console.log("➡️ /api/generate");
 
     // 1) Extraer descripción
@@ -190,7 +194,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     console.log("   ✅ uploaded to outputs:", s3key);
 
     // 6) Respuesta
-    res.json({
+    return res.json({
       resultUrl:  await signedUrl(OUTPUT_CFG.bucket, s3key),
       brandRefs:  await Promise.all(refs.map(async r => ({
         title: r.title,
@@ -201,7 +205,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 
   } catch(err) {
     console.error("❌ /api/generate error:", err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -211,7 +215,10 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 app.post("/api/iterate", async (req, res) => {
   try {
     const { previousResponseId, action, actionParam } = req.body;
-    if (!previousResponseId) return res.status(400).json({ error: "Missing previousResponseId" });
+    if (!previousResponseId) {
+      console.warn("❌ /api/iterate: missing previousResponseId");
+      return res.status(400).json({ error: "Missing previousResponseId" });
+    }
     console.log("➡️ /api/iterate", action, actionParam);
 
     // sugerir título
@@ -232,6 +239,7 @@ app.post("/api/iterate", async (req, res) => {
 
     // validar título libre
     if (action === "add_title" && !actionParam) {
+      console.warn("❌ /api/iterate add_title without param");
       return res.status(400).json({ error: "add_title requires a text parameter" });
     }
 
@@ -266,14 +274,14 @@ app.post("/api/iterate", async (req, res) => {
     const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
-    res.json({
+    return res.json({
       resultUrl:  await signedUrl(OUTPUT_CFG.bucket, key2),
       responseId: it.id
     });
 
   } catch(err) {
     console.error("❌ /api/iterate error:", err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -282,6 +290,7 @@ app.get("/api/download/:file", (_req, res) =>
   res.status(404).send("Use the signed URL in resultUrl")
 );
 
-// inicia servidor
+// Inicia servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on http://localhost:${PORT}`));
+
