@@ -4,11 +4,13 @@ export default function App() {
   const videoRef   = useRef(null);
   const canvasRef  = useRef(null);
 
-  const [captured, setCaptured]       = useState(null);
-  const [resultUrl, setResultUrl]     = useState(null);
-  const [responseId, setResponseId]   = useState(null);
-  const [brandRefs, setBrandRefs]     = useState([]);
+  const [captured, setCaptured]         = useState(null);
+  const [resultUrl, setResultUrl]       = useState(null);
+  const [responseId, setResponseId]     = useState(null);
+  const [brandRefs, setBrandRefs]       = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const API = process.env.REACT_APP_API_URL;
 
   // --- Cámara / archivo -----------------------------------------------------
   async function startCamera() {
@@ -41,7 +43,7 @@ export default function App() {
     const form = new FormData();
     form.append("image", captured, "input.png");
 
-    const res = await fetch("/api/generate", { method: "POST", body: form });
+    const res  = await fetch(`${API}/api/generate`, { method: "POST", body: form });
     const data = await res.json();
 
     setResultUrl(data.resultUrl);
@@ -60,7 +62,7 @@ export default function App() {
 
     // Sugerir título con IA
     if (action === "suggest_title") {
-      const res = await fetch("/api/iterate", {
+      const res = await fetch(`${API}/api/iterate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ previousResponseId: responseId, action })
@@ -86,7 +88,7 @@ export default function App() {
     }
 
     // Llamada de iteración normal
-    const res = await fetch("/api/iterate", {
+    const res  = await fetch(`${API}/api/iterate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ previousResponseId: responseId, action, actionParam: param })
@@ -108,8 +110,8 @@ export default function App() {
       <canvas ref={canvasRef} className="hidden" />
       <div>
         <button onClick={startCamera} disabled={isGenerating}>Usar cámara</button>
-        <button onClick={takeShot} disabled={isGenerating}>Disparar</button>
-        <input type="file" accept="image/*" onChange={onFile} disabled={isGenerating}/>
+        <button onClick={takeShot}    disabled={isGenerating}>Disparar</button>
+        <input type="file" accept="image/*" onChange={onFile} disabled={isGenerating} />
       </div>
 
       {captured && (
@@ -154,22 +156,48 @@ export default function App() {
 
           <h3>3. Iteraciones</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={() => iterate("change_palette", "Orange (#FF6200), Sky (#89D6FD), Maroon (#4D0020), Blush (#F689FD)")} disabled={isGenerating}>
+            <button
+              onClick={() =>
+                iterate(
+                  "change_palette",
+                  "Orange (#FF6200), Violet (#7724FF), Sky (#89D6FD), Maroon (#4D0020), Raspberry (#D40199), Blush (#F689FD), Sun (#FFE100)"
+                )
+              }
+              disabled={isGenerating}
+            >
               Modificar colores
             </button>
-            <button onClick={() => iterate("scale_up")}    disabled={isGenerating}>Aumentar escala</button>
-            <button onClick={() => iterate("scale_down")}  disabled={isGenerating}>Disminuir escala</button>
-            <button onClick={() => iterate("move_left")}   disabled={isGenerating}>Mover izquierda</button>
-            <button onClick={() => iterate("move_right")}  disabled={isGenerating}>Mover derecha</button>
-            <button onClick={() => iterate("add_title")}   disabled={isGenerating}>Añadir título</button>
-            <button onClick={() => iterate("suggest_title")} disabled={isGenerating}>Título con IA</button>
-            <button onClick={generate} disabled={isGenerating}>Rehacer</button>
+            <button onClick={() => iterate("scale_up")}    disabled={isGenerating}>
+              Aumentar escala
+            </button>
+            <button onClick={() => iterate("scale_down")}  disabled={isGenerating}>
+              Disminuir escala
+            </button>
+            <button onClick={() => iterate("move_left")}   disabled={isGenerating}>
+              Mover izquierda
+            </button>
+            <button onClick={() => iterate("move_right")}  disabled={isGenerating}>
+              Mover derecha
+            </button>
+            <button onClick={() => iterate("add_title")}   disabled={isGenerating}>
+              Añadir título
+            </button>
+            <button onClick={() => iterate("suggest_title")} disabled={isGenerating}>
+              Título con IA
+            </button>
+            <button onClick={generate} disabled={isGenerating}>
+              Rehacer
+            </button>
           </div>
-          {isGenerating && <p style={{ marginTop: 8 }}>Iterando… por favor espera.</p>}
+
+          {isGenerating && (
+            <p style={{ marginTop: 8, fontStyle: "italic" }}>Iterando… por favor espera.</p>
+          )}
         </>
       )}
     </>
   );
 }
+
 
 
