@@ -32,8 +32,7 @@ function parseBucket(envVar) {
     .replace(/^s3:\/\//, "")
     .replace(/\/+$/, "");
   const [bucket, ...rest] = raw.split("/");
-  const prefix = rest.join("/");
-  return { bucket, prefix };
+  return { bucket, prefix: rest.join("/") };
 }
 const BRAND_CFG  = parseBucket("S3_BUCKET_BRAND_KIT");
 const UPLOAD_CFG = parseBucket("S3_BUCKET_UPLOADS");
@@ -117,20 +116,21 @@ function cosineSim(a, b) {
   return magA && magB ? dot / Math.sqrt(magA * magA * magB * magB) : 0;
 }
 
+/**
+ * Elige las top 5 referencias, basadas en embeddings
+ */
 async function chooseBrandRefs(description, k = 5) {
-  // (Ahora k=5 en lugar de 10)
   const icons  = await listAllIcons();
   const titles = icons.map(i => i.title);
-  // Pedimos embed a todos los titles
-  const [{ data: embs }]    = await Promise.all([
+  // Pedimos embeds para todos los títulos
+  const [{ data: embs }]   = await Promise.all([
     openai.embeddings.create({ model: "text-embedding-3-small", input: titles })
   ]);
-  // Embed de la descripción
-  const [{ data: descEmb }]  = await Promise.all([
+  // Pedimos embed para la descripción
+  const [{ data: descEmb }] = await Promise.all([
     openai.embeddings.create({ model: "text-embedding-3-small", input: [description] })
   ]);
   const descVec = descEmb[0].embedding;
-  // Score y orden
   return embs
     .map((e, i) => ({ ...icons[i], score: cosineSim(e.embedding, descVec) }))
     .sort((a, b) => b.score - a.score)
@@ -163,7 +163,7 @@ const upload = multer({ storage });
  *    incluyendo posición de elementos e interpretación. 
  * 3) Selecciona 5 imágenes de referencia (top5). 
  * 4) Lee cada referencia desde S3 y lo convierte a Data URL. 
- * 5) Llama a GPT-Image (“gpt-image-1”) enviando:
+ * 5) Llama a GPT-4.1-mini (image_generation) enviando: 
  *       - Un bloque de texto con el prompt general. 
  *       - 5 Data URLs como `input_image`. 
  * 6) Guarda la imagen resultante en local y la sube a S3 (outputs). 
@@ -220,9 +220,11 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       `Use the following reference images to guide style (do not paste materials, just imitate style):`;
     console.log("   ▶ prompt:", promptText);
 
-    // 5) Llamada a GPT-Image (“gpt-image-1”) enviando prompt + 5 Data URLs
+    // 5) Llamada a GPT-4.1-mini para generar la imagen, pasando:
+    //    - Un bloque de input_text con promptText
+    //    - 5 bloques input_image con cada Data URL de referencia
     const gen = await openai.responses.create({
-      model: "gpt-image-1",    // <— ahora usamos GPT-Image nativo
+      model: "gpt-4.1-mini",
       input: [{
         role: "user",
         content: [
@@ -281,11 +283,11 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
  * 1) Si action==="suggest_title", devolvemos sólo el texto sugerido.
  * 2) Si action==="add_title", comprobamos actionParam existe.
  * 3) Traducimos la acción a un prompt textual.
- * 4) Llamamos a GPT-Image (“gpt-image-1”) PASANDO:
+ * 4) Llamamos a GPT-4.1-mini PASANDO:
  *      - Un bloque de input_text con el prompt de la modificación.
  *      - Un bloque { type:"image_generation_call", id:<imageCallId> }
- *    para editar sobre la misma base gráfica.
- * 5) Guardamos la nueva imagen, la subimos a S3 y devolvemos resultUrl + nuevo imageCallId.
+ *        para editar sobre la misma base gráfica.
+ * 5) Guardamos la nueva imagen, la subimos a S3 y devolvemos resultUrl, nuevo responseId y nuevo imageCallId.
  */
 app.post("/api/iterate", async (req, res) => {
   try {
@@ -330,9 +332,9 @@ app.post("/api/iterate", async (req, res) => {
     const text = templates[action]?.(actionParam) || `Apply modification: ${action}.`;
     console.log("   ▶ iteration prompt:", text);
 
-    // 4) Llamada multi-turn GPT-Image para editar la misma base
+    // 4) Llamada multi-turn: pedimos nueva imagen usando previousResponseId e imageCallId
     const it = await openai.responses.create({
-      model:                "gpt-image-1",
+      model:                "gpt-4.1-mini",
       previous_response_id: previousResponseId,
       input: [
         { role: "user", content: [ { type: "input_text", text } ] },
@@ -357,7 +359,7 @@ app.post("/api/iterate", async (req, res) => {
     const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
-    // 6) Devolver signed URL de la nueva imagen + nuevo imageCallId
+    // 6) Devolver signed URL de la nueva imagen, nuevo responseId y nuevo imageCallId
     return res.json({
       resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2),
       responseId:  it.id,
@@ -369,7 +371,7 @@ app.post("/api/iterate", async (req, res) => {
   }
 });
 
-// No ruta de descarga directa; el cliente debe usar el signed URL de resultUrl
+// No ruta de descarga directa; el cliente debe usar el signed URL en resultUrl
 app.get("/api/download/:file", (_req, res) =>
   res.status(404).send("Use the signed URL in resultUrl")
 );
