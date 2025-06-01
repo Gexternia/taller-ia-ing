@@ -117,7 +117,8 @@ function cosineSim(a, b) {
   return magA && magB ? dot / Math.sqrt(magA * magA * magB * magB) : 0;
 }
 
-async function chooseBrandRefs(description, k = 10) {
+async function chooseBrandRefs(description, k = 5) {
+  // (Ahora k=5 en lugar de 10)
   const icons  = await listAllIcons();
   const titles = icons.map(i => i.title);
   // Pedimos embed a todos los titles
@@ -136,7 +137,7 @@ async function chooseBrandRefs(description, k = 10) {
     .slice(0, k);
 }
 
-// 8) Convierte un file local a Data URL base64 (lo usamos para la descripción visual)
+// 8) Convierte un file local a Data URL base64 (lo usamos para descripción e input_image)
 async function imageFileToDataURL(fp) {
   const buf  = await fs.readFile(fp);
   const type = mime.lookup(fp) || "application/octet-stream";
@@ -158,16 +159,16 @@ const upload = multer({ storage });
 /** 
  * POST /api/generate
  * 1) Recibe la imagen del cliente (req.file). 
- * 2) Llama a GPT-4o para describir hasta 1000 caracteres, 
+ * 2) Llama a GPT-4o-mini para describir hasta 1000 caracteres, 
  *    incluyendo posición de elementos e interpretación. 
- * 3) Selecciona 10 imágenes de referencia (top10). 
+ * 3) Selecciona 5 imágenes de referencia (top5). 
  * 4) Lee cada referencia desde S3 y lo convierte a Data URL. 
- * 5) Llama a GPT-4.1-mini (image_generation) enviando: 
+ * 5) Llama a GPT-Image (“gpt-image-1”) enviando:
  *       - Un bloque de texto con el prompt general. 
- *       - 10 Data URLs como `input_image`. 
+ *       - 5 Data URLs como `input_image`. 
  * 6) Guarda la imagen resultante en local y la sube a S3 (outputs). 
- * 7) Devuelve al cliente el signedUrl para la imagen generada 
- *    y un array con `{ title, url: Data URL de cada ref }`. 
+ * 7) Devuelve al cliente el signedUrl para la imagen generada, 
+ *    el array de “brandRefs” (título + Data URL) y `imageCallId`.
  */
 app.post("/api/generate", upload.single("image"), async (req, res) => {
   try {
@@ -202,8 +203,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
         : msg.content.text?.trim() || "";
     console.log("   ▶ description:", description);
 
-    // 2) Elegir las 10 referencias más afines por embedding
-    const refs = await chooseBrandRefs(description, 10);
+    // 2) Elegir las 5 referencias más afines por embedding
+    const refs = await chooseBrandRefs(description, 5);
     console.log("   ▶ refs:", refs.map(r => r.title));
 
     // 3) Convertir cada referencia a Data URL (base64) leyendo desde S3
@@ -211,20 +212,17 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       refs.map(r => getObjectAsDataURL(BRAND_CFG.bucket, r.key))
     );
 
-    // 4) Construir el prompt textual base (sin incluir imágenes aún)
+    // 4) Construir el prompt textual base
     const promptText =
       `Generate a flat, vector-based icon of ${description} on a transparent background. ` +
       `Follow ING’s illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
       `Apply accent color #FF6200 sparingly and use secondary palette for contrast. ` +
       `Use the following reference images to guide style (do not paste materials, just imitate style):`;
-
     console.log("   ▶ prompt:", promptText);
 
-    // 5) Llamar a GPT-4.1-mini para generar la imagen, pasando:
-    //    - Un bloque de input_text con promptText
-    //    - 10 bloque input_image con cada Data URL de referencia
+    // 5) Llamada a GPT-Image (“gpt-image-1”) enviando prompt + 5 Data URLs
     const gen = await openai.responses.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-image-1",    // <— ahora usamos GPT-Image nativo
       input: [{
         role: "user",
         content: [
@@ -240,33 +238,34 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       }]
     });
 
-    // Extraer la imagen generada
+    // Extraer la imagen generada y su callId
     const call = gen.output.find(o => o.type === "image_generation_call");
     if (!call?.result) throw new Error("No image returned");
     console.log("   ✅ generated");
+    const initialImageCallId = call.id;
 
     // 6) Guardar en local + subir a S3 (outputs)
-    const buf   = Buffer.from(call.result, "base64");
-    const fname = `${Date.now()}.png`;
+    const buf      = Buffer.from(call.result, "base64");
+    const fname    = `${Date.now()}.png`;
     const localOut = join(OUTPUT_DIR, fname);
     await fs.writeFile(localOut, buf);
     const s3key = await uploadToS3(OUTPUT_CFG, localOut, fname);
     console.log("   ✅ uploaded to outputs:", s3key);
 
-    // 7) Generar signed URL de la imagen resultante
+    // 7) Generar signed URL para devolver al cliente
     const resultUrl = await signedUrl(OUTPUT_CFG.bucket, s3key);
 
-    // 8) Para que el cliente muestre las miniaturas, también devolvemos las Data URLs
-    //    de cada referencia junto a su título:
+    // 8) Para que el cliente muestre miniaturas, devolvemos Data URLs de referencias
     const brandRefs = refs.map((r, i) => ({
       title: r.title,
-      url:   refDataURLs[i]    // el Data URL base64 leído de S3
+      url:   refDataURLs[i]
     }));
 
     return res.json({
       resultUrl,
       brandRefs,
-      responseId: gen.id
+      responseId:  gen.id,
+      imageCallId: initialImageCallId
     });
   } catch (err) {
     console.error("❌ /api/generate error:", err);
@@ -276,18 +275,26 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 
 /**
  * POST /api/iterate
- * Igual que antes: no llevamos nuevas referencias. Se envía un prompt
- * textual simple (ej. “Change color palette to …”) y se recibe de nuevo
- * una única imagen resultante para iterar.
+ * Parámetros esperados en body: 
+ *   { previousResponseId, imageCallId, action, actionParam }
+ * 
+ * 1) Si action==="suggest_title", devolvemos sólo el texto sugerido.
+ * 2) Si action==="add_title", comprobamos actionParam existe.
+ * 3) Traducimos la acción a un prompt textual.
+ * 4) Llamamos a GPT-Image (“gpt-image-1”) PASANDO:
+ *      - Un bloque de input_text con el prompt de la modificación.
+ *      - Un bloque { type:"image_generation_call", id:<imageCallId> }
+ *    para editar sobre la misma base gráfica.
+ * 5) Guardamos la nueva imagen, la subimos a S3 y devolvemos resultUrl + nuevo imageCallId.
  */
 app.post("/api/iterate", async (req, res) => {
   try {
-    const { previousResponseId, action, actionParam } = req.body;
-    if (!previousResponseId) {
-      console.warn("❌ /api/iterate: missing previousResponseId");
-      return res.status(400).json({ error: "Missing previousResponseId" });
+    const { previousResponseId, imageCallId, action, actionParam } = req.body;
+    if (!previousResponseId || !imageCallId) {
+      console.warn("❌ /api/iterate: missing previousResponseId or imageCallId");
+      return res.status(400).json({ error: "Missing previousResponseId or imageCallId" });
     }
-    console.log("➡️ /api/iterate", action, actionParam);
+    console.log("➡️ /api/iterate", action, actionParam, "prevResp:", previousResponseId, "callId:", imageCallId);
 
     // 1) Sugerir título con IA
     if (action === "suggest_title") {
@@ -305,7 +312,7 @@ app.post("/api/iterate", async (req, res) => {
       return res.json({ suggestedTitle: sug });
     }
 
-    // 2) Validar que add_title reciba param
+    // 2) Validar que add_title reciba actionParam
     if (action === "add_title" && !actionParam) {
       console.warn("❌ /api/iterate add_title without param");
       return res.status(400).json({ error: "add_title requires a text parameter" });
@@ -323,11 +330,14 @@ app.post("/api/iterate", async (req, res) => {
     const text = templates[action]?.(actionParam) || `Apply modification: ${action}.`;
     console.log("   ▶ iteration prompt:", text);
 
-    // 4) Llamada multi-turn: pedimos nueva imagen usando previousResponseId
+    // 4) Llamada multi-turn GPT-Image para editar la misma base
     const it = await openai.responses.create({
-      model:                "gpt-4.1-mini",
+      model:                "gpt-image-1",
       previous_response_id: previousResponseId,
-      input:                text,
+      input: [
+        { role: "user", content: [ { type: "input_text", text } ] },
+        { type: "image_generation_call", id: imageCallId }
+      ],
       tools: [{
         type:       "image_generation",
         background: "transparent",
@@ -347,10 +357,11 @@ app.post("/api/iterate", async (req, res) => {
     const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
-    // 6) Devolver al cliente el signed URL de la nueva imagen
+    // 6) Devolver signed URL de la nueva imagen + nuevo imageCallId
     return res.json({
-      resultUrl: await signedUrl(OUTPUT_CFG.bucket, key2),
-      responseId: it.id
+      resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2),
+      responseId:  it.id,
+      imageCallId: call2.id
     });
   } catch (err) {
     console.error("❌ /api/iterate error:", err);
@@ -358,7 +369,7 @@ app.post("/api/iterate", async (req, res) => {
   }
 });
 
-//  No ruta de descarga directa; el cliente debe usar el signed URL de resultUrl
+// No ruta de descarga directa; el cliente debe usar el signed URL de resultUrl
 app.get("/api/download/:file", (_req, res) =>
   res.status(404).send("Use the signed URL in resultUrl")
 );
