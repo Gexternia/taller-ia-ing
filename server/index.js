@@ -266,7 +266,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     return res.json({
       resultUrl,
       brandRefs,
-      responseId: gen.id,
+      responseId:  gen.id,
       imageCallId: call.id
     });
   } catch (err) {
@@ -279,8 +279,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
  * POST /api/iterate
  * 1) Recibe previousResponseId + imageCallId + action (+ actionParam si aplica).
  * 2) Mapea action → prompt textual.
- * 3) Llama a GPT-4.1-mini con `previous_response_id` Y un bloque:
- *      { type: "image_generation_call", id: imageCallId }
+ * 3) Llama a GPT-4.1-mini enviando **solo** el bloque `{ type: "image_generation_call", id: imageCallId }`
+ *    junto con el texto; **No incluye** `previous_response_id` aquí para evitar duplicado.
  * 4) La API genera una edición de esa imagen previa; guardamos/subimos a S3 y devolvemos
  *    nuevo `responseId`, `imageCallId` y `resultUrl`.
  */
@@ -291,7 +291,8 @@ app.post("/api/iterate", async (req, res) => {
       console.warn("❌ /api/iterate: missing previousResponseId or imageCallId");
       return res.status(400).json({ error: "Missing previousResponseId or imageCallId" });
     }
-    console.log("➡️ /api/iterate", action, actionParam, "prevResp:", previousResponseId, "callId:", imageCallId);
+    console.log("➡️ /api/iterate", action, actionParam, 
+                "prevResp:", previousResponseId, "callId:", imageCallId);
 
     // 1) Sugerir título con IA
     if (action === "suggest_title") {
@@ -327,10 +328,9 @@ app.post("/api/iterate", async (req, res) => {
     const text = templates[action]?.(actionParam) || `Apply modification: ${action}.`;
     console.log("   ▶ iteration prompt:", text);
 
-    // 4) Llamada multi-turn usando previousResponseId + image_generation_call
+    // 4) Llamada multi-turn PARA EDICIÓN: enviamos SOLO el bloque `image_generation_call` (sin previous_response_id)
     const it = await openai.responses.create({
-      model:                "gpt-4.1-mini",
-      previous_response_id: previousResponseId,
+      model: "gpt-4.1-mini",
       input: [
         {
           role:    "user",
