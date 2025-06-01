@@ -363,12 +363,12 @@ app.get("/api/download/:file", (_req, res) =>
   res.status(404).send("Use the signed URL in resultUrl")
 );
 
-// 10) (Opcional) Si quieres servir el frontend React desde el mismo Back end:
-// const CLIENT_DIST = join(__dirname, "../client/dist");
-// app.use(express.static(CLIENT_DIST));
-// app.get("*", (_req, res) => {
-//   res.sendFile(join(CLIENT_DIST, "index.html"));
-// });
+// 10) Servir el frontend React compilado desde client/dist
+const CLIENT_DIST = join(__dirname, "../client/dist");
+app.use(express.static(CLIENT_DIST));
+app.get("*", (_req, res) => {
+  res.sendFile(join(CLIENT_DIST, "index.html"));
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on port ${PORT}`));
