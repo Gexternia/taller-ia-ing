@@ -26,7 +26,7 @@ const OUTPUT_DIR = join(__dirname, "tmp_outputs");
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
 await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
-// 3) Configuración de buckets S3 (sin el prefijo "s3://", ni slash final)
+// 3) Configuración de buckets S3 (sin prefijo ni slash final)
 function parseBucket(envVar) {
   const raw = (process.env[envVar] || "")
     .replace(/^s3:\/\//, "")
@@ -48,15 +48,9 @@ const openai = new OpenAI({
 });
 
 // 5) Helpers S3
-
-/**
- * Devuelve un Data URL (base64) a partir de la clave de un objeto en S3.
- * Usa GetObjectCommand para leer el buffer completo.
- */
 async function getObjectAsDataURL(bucketName, key) {
   const getCmd = new GetObjectCommand({ Bucket: bucketName, Key: key });
   const data   = await s3.send(getCmd);
-  // data.Body es un ReadableStream; lo convertimos a Buffer:
   const chunks = [];
   for await (const chunk of data.Body) {
     chunks.push(chunk);
@@ -66,19 +60,11 @@ async function getObjectAsDataURL(bucketName, key) {
   return `data:${mimeType};base64,${buffer.toString("base64")}`;
 }
 
-/**
- * Devuelve un URL firmado (presigned) para lectura en S3 (usado sólo para devolver al cliente
- * la URL de la imagen generada).
- */
 async function signedUrl(bucket, key) {
   const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
   return getSignedUrl(s3, cmd, { expiresIn: 3600 });
 }
 
-/**
- * Sube un archivo local a S3 (se leen los bytes con fs.readFile),
- * devuelve la Key usada (prefijo + nombre) para futuras referencias.
- */
 async function uploadToS3(cfg, localPath, filename) {
   const Body = await fs.readFile(localPath);
   const Key  = cfg.prefix ? `${cfg.prefix}/${filename}` : filename;
@@ -120,23 +106,20 @@ function cosineSim(a, b) {
 async function chooseBrandRefs(description, k = 5) {
   const icons  = await listAllIcons();
   const titles = icons.map(i => i.title);
-  // 7.1) Pedimos embedding a todos los titles
-  const [{ data: embs }]    = await Promise.all([
+  const [{ data: embs }]   = await Promise.all([
     openai.embeddings.create({ model: "text-embedding-3-small", input: titles })
   ]);
-  // 7.2) Embed de la descripción
-  const [{ data: descEmb }]  = await Promise.all([
+  const [{ data: descEmb }] = await Promise.all([
     openai.embeddings.create({ model: "text-embedding-3-small", input: [description] })
   ]);
   const descVec = descEmb[0].embedding;
-  // 7.3) Calculo de score y orden
   return embs
     .map((e, i) => ({ ...icons[i], score: cosineSim(e.embedding, descVec) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
 }
 
-// 8) Convierte un file local a Data URL base64 (lo usamos para la descripción visual)
+// 8) Convertir archivo local a Data URL base64
 async function imageFileToDataURL(fp) {
   const buf  = await fs.readFile(fp);
   const type = mime.lookup(fp) || "application/octet-stream";
@@ -148,7 +131,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Multer temporal para recibir la imagen subida por el usuario
 const storage = multer.diskStorage({
   destination: (_r, _f, cb) => cb(null, UPLOAD_DIR),
   filename:    (_r, f, cb)  => cb(null, Date.now() + extname(f.originalname))
@@ -157,18 +139,15 @@ const upload = multer({ storage });
 
 /** 
  * POST /api/generate
- * 1) Recibe la imagen del cliente (req.file). 
- * 2) Llama a GPT-4o-mini para describir hasta 1000 caracteres, 
- *    incluyendo posición de elementos e interpretación. 
- * 3) Selecciona 5 imágenes de referencia (top5). 
- * 4) Lee cada referencia desde S3 y lo convierte a Data URL. 
- * 5) Llama a GPT-4.1-mini (image_generation) enviando: 
- *       - Un bloque de texto con el prompt general. 
- *       - 5 Data URLs como `input_image`. 
- * 6) Guarda la imagen resultante en local y la sube a S3 (outputs). 
- * 7) Devuelve al cliente el signedUrl para la imagen generada 
- *    y un array con `{ title, url: Data URL de cada ref }`, 
- *    además de `responseId` e `imageCallId` para iteraciones posteriores.
+ *   1) Recibe una imagen.
+ *   2) GPT-4o‐mini describe (hasta 1000 caracteres, con posiciones e interpretación).
+ *   3) Selecciona 5 referencias (top 5 por embedding).
+ *   4) Lee cada referencia desde S3 → Data URL.
+ *   5) GPT‐4.1‐mini (image_generation) recibe:
+ *        • promptText
+ *        • 5 Data URLs
+ *   6) Guarda imagen resultante y sube a S3.
+ *   7) Devuelve resultUrl, brandRefs, responseId e imageCallId.
  */
 app.post("/api/generate", upload.single("image"), async (req, res) => {
   try {
@@ -178,7 +157,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     }
     console.log("➡️ /api/generate");
 
-    // 1) Pedir descripción extendida a GPT-4o-mini (hasta 1000 chars, con posiciones/interpretación)
+    // 1) Descripción con GPT-4o‐mini
     const vision = await openai.responses.create({
       model: "gpt-4o-mini",
       input: [{
@@ -207,12 +186,12 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     const refs = await chooseBrandRefs(description, 5);
     console.log("   ▶ refs:", refs.map(r => r.title));
 
-    // 3) Convertir cada referencia a Data URL (base64) leyendo desde S3
+    // 3) Convertir cada referencia a Data URL
     const refDataURLs = await Promise.all(
       refs.map(r => getObjectAsDataURL(BRAND_CFG.bucket, r.key))
     );
 
-    // 4) Construir el prompt textual base (sin incluir imágenes aún)
+    // 4) Construir prompt textual base
     const promptText =
       `Generate a flat, vector-based icon of ${description} on a transparent background. ` +
       `Follow ING’s illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
@@ -220,9 +199,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       `Use the following reference images to guide style (do not paste materials, just imitate style):`;
     console.log("   ▶ prompt:", promptText);
 
-    // 5) Llamar a GPT-4.1-mini para generar la imagen, pasando:
-    //    - Un bloque de input_text con promptText
-    //    - 5 bloques input_image con cada Data URL de referencia
+    // 5) Llamada a GPT‐4.1‐mini (image_generation)
     const gen = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: [{
@@ -240,12 +217,12 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       }]
     });
 
-    // 5.1) Extraer el ID de la llamada concreta de image_generation
+    // 5.1) Extraer ID de image_generation_call
     const call = gen.output.find(o => o.type === "image_generation_call");
     if (!call?.result) throw new Error("No image returned");
     console.log("   ✅ generated; imageCallId=", call.id);
 
-    // 6) Guardar en local + subir a S3 (outputs)
+    // 6) Guardar + subir a S3
     const buf   = Buffer.from(call.result, "base64");
     const fname = `${Date.now()}.png`;
     const localOut = join(OUTPUT_DIR, fname);
@@ -253,16 +230,16 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     const s3key = await uploadToS3(OUTPUT_CFG, localOut, fname);
     console.log("   ✅ uploaded to outputs:", s3key);
 
-    // 7) Generar signed URL de la imagen resultante
+    // 7) Obtener signed URL
     const resultUrl = await signedUrl(OUTPUT_CFG.bucket, s3key);
 
-    // 8) Para que el cliente muestre las miniaturas, devolvemos las Data URLs de cada referencia
+    // 8) Preparar miniaturas de referencias para el cliente
     const brandRefs = refs.map((r, i) => ({
       title: r.title,
-      url:   refDataURLs[i] // Data URL base64 leído de S3
+      url:   refDataURLs[i]
     }));
 
-    // 9) Devolver todo al cliente, incluyendo `responseId` e `imageCallId`
+    // 9) Responder al cliente con todo
     return res.json({
       resultUrl,
       brandRefs,
@@ -277,12 +254,13 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 
 /**
  * POST /api/iterate
- * 1) Recibe previousResponseId + imageCallId + action (+ actionParam si aplica).
- * 2) Mapea action → prompt textual.
- * 3) Llama a GPT-4.1-mini enviando **solo** el bloque `{ type: "image_generation_call", id: imageCallId }`
- *    junto con el texto; **No incluye** `previous_response_id` aquí para evitar duplicado.
- * 4) La API genera una edición de esa imagen previa; guardamos/subimos a S3 y devolvemos
- *    nuevo `responseId`, `imageCallId` y `resultUrl`.
+ *   1) Recibe previousResponseId + imageCallId + action (+ actionParam opcional).
+ *   2) Para “suggest_title” se comporta igual que antes.
+ *   3) Para “add_title”, “change_palette”, etc. → mapea la acción a texto.
+ *   4) Para “chat” (action === "chat") → usa `actionParam` puro como prompt.
+ *   5) Llama a GPT‐4.1‐mini ENVIANDO SOLO { type:"image_generation_call", id:imageCallId }
+ *      junto con el bloque de texto (nunca `previous_response_id` en el mismo request).
+ *   6) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
  */
 app.post("/api/iterate", async (req, res) => {
   try {
@@ -291,10 +269,14 @@ app.post("/api/iterate", async (req, res) => {
       console.warn("❌ /api/iterate: missing previousResponseId or imageCallId");
       return res.status(400).json({ error: "Missing previousResponseId or imageCallId" });
     }
-    console.log("➡️ /api/iterate", action, actionParam, 
-                "prevResp:", previousResponseId, "callId:", imageCallId);
+    console.log(
+      "➡️ /api/iterate",
+      action, actionParam,
+      "prevResp:", previousResponseId,
+      "callId:", imageCallId
+    );
 
-    // 1) Sugerir título con IA
+    // 1) Sugerir título con IA (igual que antes)
     if (action === "suggest_title") {
       const tit = await openai.responses.create({
         model:                "gpt-4.1-mini",
@@ -310,13 +292,13 @@ app.post("/api/iterate", async (req, res) => {
       return res.json({ suggestedTitle: sug });
     }
 
-    // 2) Validar que add_title reciba param
+    // 2) Validar que add_title reciba actionParam
     if (action === "add_title" && !actionParam) {
       console.warn("❌ /api/iterate add_title without param");
       return res.status(400).json({ error: "add_title requires a text parameter" });
     }
 
-    // 3) Mapear cada acción a un prompt textual
+    // 3) Mapear las acciones conocidas
     const templates = {
       change_palette: p => `Change color palette to ${p}.`,
       scale_up:       () => `Increase the size of the main object.`,
@@ -325,21 +307,21 @@ app.post("/api/iterate", async (req, res) => {
       move_right:     () => `Move the main object slightly to the right.`,
       add_title:      p => `Add the following title below the image: "${p}".`
     };
-    const text = templates[action]?.(actionParam) || `Apply modification: ${action}.`;
+
+    // 4) Si action === "chat", usamos actionParam directamente como prompt
+    const text =
+      action === "chat"
+        ? actionParam
+        : (templates[action]?.(actionParam) || `Apply modification: ${action}.`);
+
     console.log("   ▶ iteration prompt:", text);
 
-    // 4) Llamada multi-turn PARA EDICIÓN: enviamos SOLO el bloque `image_generation_call` (sin previous_response_id)
+    // 5) Llamada multi-turn de edición (sin previous_response_id)
     const it = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: [
-        {
-          role:    "user",
-          content: [{ type: "input_text", text }]
-        },
-        {
-          type: "image_generation_call",
-          id:   imageCallId
-        }
+        { role: "user", content: [{ type: "input_text", text }] },
+        { type: "image_generation_call", id: imageCallId }
       ],
       tools: [{
         type:       "image_generation",
@@ -352,7 +334,7 @@ app.post("/api/iterate", async (req, res) => {
     if (!call2?.result) throw new Error("No image returned from iteration");
     console.log("   ✅ iteration generated; new imageCallId=", call2.id);
 
-    // 5) Guardar + subir a S3 (outputs)
+    // 6) Guardar + subir a S3
     const buf2   = Buffer.from(call2.result, "base64");
     const fname2 = `${Date.now()}.png`;
     const local2 = join(OUTPUT_DIR, fname2);
@@ -360,7 +342,7 @@ app.post("/api/iterate", async (req, res) => {
     const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
-    // 6) Responder con nuevo signedUrl, responseId e imageCallId
+    // 7) Responder con nuevo signedUrl, responseId e imageCallId
     return res.json({
       resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2),
       responseId:  it.id,

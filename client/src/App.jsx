@@ -4,12 +4,18 @@ export default function App() {
   const videoRef   = useRef(null);
   const canvasRef  = useRef(null);
 
-  const [captured, setCaptured]           = useState(null);
-  const [resultUrl, setResultUrl]         = useState(null);
-  const [responseId, setResponseId]       = useState(null);
-  const [imageCallId, setImageCallId]     = useState(null); // <--- Nuevo
-  const [brandRefs, setBrandRefs]         = useState([]);
-  const [isGenerating, setIsGenerating]   = useState(false);
+  const [captured, setCaptured]         = useState(null);
+  const [resultUrl, setResultUrl]       = useState(null);
+  const [responseId, setResponseId]     = useState(null);
+  const [imageCallId, setImageCallId]   = useState(null);
+  const [brandRefs, setBrandRefs]       = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Control de sub‐menús
+  const [showColorOptions, setShowColorOptions]   = useState(false);
+  const [showChatBox, setShowChatBox]             = useState(false);
+  const [showTitleOptions, setShowTitleOptions]   = useState(false);
+  const [chatText, setChatText]                   = useState("");
 
   // --- Cámara / archivo -----------------------------------------------------
   async function startCamera() {
@@ -35,10 +41,14 @@ export default function App() {
       return;
     }
     setIsGenerating(true);
+    // Limpiar todos los estados de iteración
     setResultUrl(null);
     setResponseId(null);
-    setImageCallId(null);    // <--- Limpiamos antes de generar
+    setImageCallId(null);
     setBrandRefs([]);
+    setShowColorOptions(false);
+    setShowChatBox(false);
+    setShowTitleOptions(false);
 
     const form = new FormData();
     form.append("image", captured, "input.png");
@@ -46,10 +56,9 @@ export default function App() {
     const res  = await fetch("/api/generate", { method: "POST", body: form });
     const data = await res.json();
 
-    // guardamos el responseId e imageCallId que devuelve el backend
     setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
-    setImageCallId(data.imageCallId); // <--- Nuevo
+    setImageCallId(data.imageCallId);
     setBrandRefs(data.brandRefs || []);
     setIsGenerating(false);
   }
@@ -69,12 +78,15 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           previousResponseId: responseId,
-          imageCallId,                  // <--- enviamos también imageCallId
+          imageCallId,
           action
         })
       });
       const { suggestedTitle } = await res.json();
-      const userTitle = window.prompt("¿Te gusta este título? Si quieres editarlo:", suggestedTitle);
+      const userTitle = window.prompt(
+        "¿Te gusta este título? Si quieres editarlo:", 
+        suggestedTitle
+      );
       if (userTitle) {
         await iterate("add_title", userTitle);
       } else {
@@ -93,23 +105,31 @@ export default function App() {
       param = userTitle;
     }
 
-    // 3) Llamada de iteración normal
+    // 3) Modificación vía chat (action === "chat")
+    if (action === "chat" && !param) {
+      alert("Escribe algo en el cuadro de chat antes de enviar");
+      setIsGenerating(false);
+      return;
+    }
+
+    // 4) Llamada de iteración normal (o chat)
+    const payload = {
+      previousResponseId: responseId,
+      imageCallId,
+      action
+    };
+    if (param) payload.actionParam = param;
+
     const res = await fetch("/api/iterate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        previousResponseId: responseId,
-        imageCallId,                   // <--- enviamos también imageCallId
-        action,
-        actionParam: param
-      })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
-    // Actualizamos el resultado y los IDs
     setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
-    setImageCallId(data.imageCallId); // <--- Actualizamos el nuevo imageCallId
+    setImageCallId(data.imageCallId);
     setIsGenerating(false);
   }
 
@@ -168,27 +188,149 @@ export default function App() {
           </div>
 
           <h3>3. Iteraciones</h3>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            {/* Botón 1: Modificar colores */}
             <button
-              onClick={() =>
-                iterate(
-                  "change_palette",
-                  "Orange (#FF6200), Sky (#89D6FD), Maroon (#4D0020), Blush (#F689FD)"
-                )
-              }
+              onClick={() => {
+                setShowColorOptions(!showColorOptions);
+                setShowChatBox(false);
+                setShowTitleOptions(false);
+              }}
               disabled={isGenerating}
             >
               Modificar colores
             </button>
-            <button onClick={() => iterate("scale_up")}    disabled={isGenerating}>Aumentar escala</button>
-            <button onClick={() => iterate("scale_down")}  disabled={isGenerating}>Disminuir escala</button>
-            <button onClick={() => iterate("move_left")}   disabled={isGenerating}>Mover izquierda</button>
-            <button onClick={() => iterate("move_right")}  disabled={isGenerating}>Mover derecha</button>
-            <button onClick={() => iterate("add_title")}   disabled={isGenerating}>Añadir título</button>
-            <button onClick={() => iterate("suggest_title")} disabled={isGenerating}>Título con IA</button>
-            <button onClick={generate} disabled={isGenerating}>Rehacer</button>
+
+            {/* Botón 2: Modificar vía chat */}
+            <button
+              onClick={() => {
+                setShowChatBox(!showChatBox);
+                setShowColorOptions(false);
+                setShowTitleOptions(false);
+              }}
+              disabled={isGenerating}
+            >
+              Modificar vía chat
+            </button>
+
+            {/* Botón 3: Modificar título */}
+            <button
+              onClick={() => {
+                setShowTitleOptions(!showTitleOptions);
+                setShowColorOptions(false);
+                setShowChatBox(false);
+              }}
+              disabled={isGenerating}
+            >
+              Modificar título
+            </button>
+
+            {/* Botón 4: Volver a generar */}
+            <button onClick={generate} disabled={isGenerating}>
+              Volver a generar
+            </button>
           </div>
-          {isGenerating && <p style={{ marginTop: 8, fontStyle: "italic" }}>Iterando… por favor, espera.</p>}
+
+          {/* Sub‐menú “Modificar colores” (4 opciones hexadecimales) */}
+          {showColorOptions && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <button
+                onClick={() =>
+                  iterate(
+                    "change_palette",
+                    "Orange (#FF6200), Sky (#89D6FD), Maroon (#4D0020), Blush (#F689FD)"
+                  )
+                }
+                disabled={isGenerating}
+              >
+                Orange + Sky + Maroon + Blush
+              </button>
+
+              <button
+                onClick={() =>
+                  iterate(
+                    "change_palette",
+                    "Orange (#FF6200), Maroon (#4D0020), Raspberry (#D40199), Blush (#F689FD)"
+                  )
+                }
+                disabled={isGenerating}
+              >
+                Orange + Maroon + Raspberry + Blush
+              </button>
+
+              <button
+                onClick={() =>
+                  iterate(
+                    "change_palette",
+                    "Orange (#FF6200), Raspberry (#D40199), Blush (#F689FD), Sun (#FFE100)"
+                  )
+                }
+                disabled={isGenerating}
+              >
+                Orange + Raspberry + Blush + Sun
+              </button>
+
+              <button
+                onClick={() =>
+                  iterate(
+                    "change_palette",
+                    "Orange (#FF6200), Violet (#7724FF), Sky (#89D6FD), Maroon (#4D0020)"
+                  )
+                }
+                disabled={isGenerating}
+              >
+                Orange + Violet + Sky + Maroon
+              </button>
+            </div>
+          )}
+
+          {/* Sub‐menú “Modificar vía chat” (input + enviar) */}
+          {showChatBox && (
+            <div style={{ marginBottom: 16 }}>
+              <textarea
+                rows={3}
+                style={{ width: "100%", marginBottom: 8 }}
+                placeholder="Escribe aquí la modificación que quieras aplicar..."
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                disabled={isGenerating}
+              />
+              <button
+                onClick={() => {
+                  iterate("chat", chatText);
+                  setShowChatBox(false);
+                  setChatText("");
+                }}
+                disabled={isGenerating || !chatText.trim()}
+              >
+                Enviar modificación
+              </button>
+            </div>
+          )}
+
+          {/* Sub‐menú “Modificar título” (2 opciones) */}
+          {showTitleOptions && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <button
+                onClick={() => iterate("add_title")}
+                disabled={isGenerating}
+              >
+                Añadir un título
+              </button>
+              <button
+                onClick={() => iterate("suggest_title")}
+                disabled={isGenerating}
+              >
+                Título con IA
+              </button>
+            </div>
+          )}
+
+          {isGenerating && (
+            <p style={{ marginTop: 8, fontStyle: "italic" }}>
+              Iterando… por favor, espera.
+            </p>
+          )}
         </>
       )}
     </>
