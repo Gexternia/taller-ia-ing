@@ -120,16 +120,16 @@ function cosineSim(a, b) {
 async function chooseBrandRefs(description, k = 5) {
   const icons  = await listAllIcons();
   const titles = icons.map(i => i.title);
-  // Pedimos embedding a todos los titles
+  // 7.1) Pedimos embedding a todos los titles
   const [{ data: embs }]    = await Promise.all([
     openai.embeddings.create({ model: "text-embedding-3-small", input: titles })
   ]);
-  // Embed de la descripción
+  // 7.2) Embed de la descripción
   const [{ data: descEmb }]  = await Promise.all([
     openai.embeddings.create({ model: "text-embedding-3-small", input: [description] })
   ]);
   const descVec = descEmb[0].embedding;
-  // Calculo de score y orden
+  // 7.3) Calculo de score y orden
   return embs
     .map((e, i) => ({ ...icons[i], score: cosineSim(e.embedding, descVec) }))
     .sort((a, b) => b.score - a.score)
@@ -167,7 +167,8 @@ const upload = multer({ storage });
  *       - 5 Data URLs como `input_image`. 
  * 6) Guarda la imagen resultante en local y la sube a S3 (outputs). 
  * 7) Devuelve al cliente el signedUrl para la imagen generada 
- *    y un array con `{ title, url: Data URL de cada ref }`. 
+ *    y un array con `{ title, url: Data URL de cada ref }`, 
+ *    además de `responseId` e `imageCallId` para iteraciones posteriores.
  */
 app.post("/api/generate", upload.single("image"), async (req, res) => {
   try {
@@ -239,10 +240,10 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       }]
     });
 
-    // Extraer la imagen generada
+    // 5.1) Extraer el ID de la llamada concreta de image_generation
     const call = gen.output.find(o => o.type === "image_generation_call");
     if (!call?.result) throw new Error("No image returned");
-    console.log("   ✅ generated");
+    console.log("   ✅ generated; imageCallId=", call.id);
 
     // 6) Guardar en local + subir a S3 (outputs)
     const buf   = Buffer.from(call.result, "base64");
@@ -255,17 +256,18 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     // 7) Generar signed URL de la imagen resultante
     const resultUrl = await signedUrl(OUTPUT_CFG.bucket, s3key);
 
-    // 8) Para que el cliente muestre las miniaturas, también devolvemos las Data URLs
-    //    de cada referencia junto a su título:
+    // 8) Para que el cliente muestre las miniaturas, devolvemos las Data URLs de cada referencia
     const brandRefs = refs.map((r, i) => ({
       title: r.title,
-      url:   refDataURLs[i] // el Data URL base64 leído de S3
+      url:   refDataURLs[i] // Data URL base64 leído de S3
     }));
 
+    // 9) Devolver todo al cliente, incluyendo `responseId` e `imageCallId`
     return res.json({
       resultUrl,
       brandRefs,
-      responseId: gen.id
+      responseId: gen.id,
+      imageCallId: call.id
     });
   } catch (err) {
     console.error("❌ /api/generate error:", err);
@@ -273,22 +275,23 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
   }
 });
 
-
 /**
  * POST /api/iterate
- * 1) Recibe sólo previousResponseId + action (+ actionParam si aplica).
- * 2) Genera un nuevo prompt de edición (texto puro).
- * 3) Llama a GPT-4.1-mini con previous_response_id: no duplicamos ningún imageCallId.
- * 4) Recibe una única imagen nueva. La guarda/sube a S3 y devuelve el nuevo signed URL + nuevo responseId.
+ * 1) Recibe previousResponseId + imageCallId + action (+ actionParam si aplica).
+ * 2) Mapea action → prompt textual.
+ * 3) Llama a GPT-4.1-mini con `previous_response_id` Y un bloque:
+ *      { type: "image_generation_call", id: imageCallId }
+ * 4) La API genera una edición de esa imagen previa; guardamos/subimos a S3 y devolvemos
+ *    nuevo `responseId`, `imageCallId` y `resultUrl`.
  */
 app.post("/api/iterate", async (req, res) => {
   try {
-    const { previousResponseId, action, actionParam } = req.body;
-    if (!previousResponseId) {
-      console.warn("❌ /api/iterate: missing previousResponseId");
-      return res.status(400).json({ error: "Missing previousResponseId" });
+    const { previousResponseId, imageCallId, action, actionParam } = req.body;
+    if (!previousResponseId || !imageCallId) {
+      console.warn("❌ /api/iterate: missing previousResponseId or imageCallId");
+      return res.status(400).json({ error: "Missing previousResponseId or imageCallId" });
     }
-    console.log("➡️ /api/iterate", action, actionParam);
+    console.log("➡️ /api/iterate", action, actionParam, "prevResp:", previousResponseId, "callId:", imageCallId);
 
     // 1) Sugerir título con IA
     if (action === "suggest_title") {
@@ -324,11 +327,20 @@ app.post("/api/iterate", async (req, res) => {
     const text = templates[action]?.(actionParam) || `Apply modification: ${action}.`;
     console.log("   ▶ iteration prompt:", text);
 
-    // 4) Llamada multi-turn: pedimos nueva imagen usando previousResponseId (sin imageCallId)
+    // 4) Llamada multi-turn usando previousResponseId + image_generation_call
     const it = await openai.responses.create({
       model:                "gpt-4.1-mini",
       previous_response_id: previousResponseId,
-      input:                text,
+      input: [
+        {
+          role:    "user",
+          content: [{ type: "input_text", text }]
+        },
+        {
+          type: "image_generation_call",
+          id:   imageCallId
+        }
+      ],
       tools: [{
         type:       "image_generation",
         background: "transparent",
@@ -337,8 +349,8 @@ app.post("/api/iterate", async (req, res) => {
       }]
     });
     const call2 = it.output.find(o => o.type === "image_generation_call");
-    if (!call2?.result) throw new Error("No image returned");
-    console.log("   ✅ iteration generated");
+    if (!call2?.result) throw new Error("No image returned from iteration");
+    console.log("   ✅ iteration generated; new imageCallId=", call2.id);
 
     // 5) Guardar + subir a S3 (outputs)
     const buf2   = Buffer.from(call2.result, "base64");
@@ -348,10 +360,11 @@ app.post("/api/iterate", async (req, res) => {
     const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
-    // 6) Devolver al cliente el signed URL de la nueva imagen
+    // 6) Responder con nuevo signedUrl, responseId e imageCallId
     return res.json({
-      resultUrl: await signedUrl(OUTPUT_CFG.bucket, key2),
-      responseId: it.id
+      resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2),
+      responseId:  it.id,
+      imageCallId: call2.id
     });
   } catch (err) {
     console.error("❌ /api/iterate error:", err);
