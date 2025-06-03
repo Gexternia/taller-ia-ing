@@ -168,7 +168,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
           {
             type: "input_text",
             text:
-              "You are a famous ilustrator, and your role here is to analyze some pieces of homemade art craft ideas"
+              "You are a famous ilustrator, and your role here is to analyze some pieces of homemade art craft ideas" +
               "Describe what you see in this image in up to 250 characters " +
               "as an interpretation —not focusing on materials or style— of what the user wanted to represent " +
               "make sure to include positions of all objects in the image."
@@ -197,7 +197,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     const promptText =
       `Generate a flat, vector-based icon illustration on a transparent background. ` +
       `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
-      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style):`
+      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style):` +
       `of ${description}`;
 
     console.log("   ▶ prompt:", promptText);
@@ -316,7 +316,7 @@ Given the user’s free-text instruction and the original description of the pre
 - Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details.
 - Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the flat and vector-based guideline.
 - Keep the same main object that appeared in the previous image: "${originalDescription}".
-- It is important to matain consistency.´
+- It is important to matain consistency.
 - Limit your answers below 250 characters.
 
 Client’s raw instruction:
