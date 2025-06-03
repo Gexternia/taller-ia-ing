@@ -168,9 +168,10 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
           {
             type: "input_text",
             text:
-              "Describe what you see in this image in up to 1000 characters " +
+              "You are a famous ilustrator, and your role here is to analyze some pieces of homemade art craft ideas"
+              "Describe what you see in this image in up to 250 characters " +
               "as an interpretation —not focusing on materials or style— of what the user wanted to represent " +
-              "but including positions of all objects (e.g., 'The lion is centered, facing right; behind it is a sunset on the left, trees on the right')."
+              "make sure to include positions of all objects in the image."
           }
         ]
       }]
@@ -194,10 +195,11 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 
     // 4) Construir prompt textual base
     const promptText =
-      `Generate a flat, vector-based icon of ${description} on a transparent background. ` +
-      `Follow ING’s illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
-      `Apply accent color #FF6200 sparingly and use secondary palette for contrast. ` +
-      `Use the following reference images to guide style (do not paste materials, just imitate style):`;
+      `Generate a flat, vector-based icon illustration on a transparent background. ` +
+      `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
+      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style):`
+      `of ${description}`;
+
     console.log("   ▶ prompt:", promptText);
 
     // 5) Llamada a GPT‐4.1‐mini (image_generation)
@@ -309,17 +311,18 @@ app.post("/api/iterate", async (req, res) => {
 
       // Ahora incluimos originalDescription para asegurarnos de que el “main object” permanece igual
       const rewritePrompt = `
-You are an AI style police for ING’s illustration prompts.
+You are an AI style police for illustration prompts.
 Given the user’s free-text instruction and the original description of the previous image, rewrite it so that:
-- Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details. Add a touch of humor.
-- Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the “flat, vector-based” guideline.
+- Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details.
+- Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the flat and vector-based guideline.
 - Keep the same main object that appeared in the previous image: "${originalDescription}".
-- Only adjust small arrangements or add a slight “sci-fi” reference if requested, without changing the central object.
+- It is important to matain consistency.´
+- Limit your answers below 250 characters.
 
 Client’s raw instruction:
 "${rawInstr.replace(/"/g, '\\"')}"
 
-Rewrite that instruction to follow EXACTLY the above guidelines—and nothing else.
+Rewrite that instruction to follow EXACTLY the above guidelines —and nothing else.
 Return only the clean text (no explanations).
       `;
 
