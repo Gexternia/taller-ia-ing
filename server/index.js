@@ -297,21 +297,21 @@ app.post("/api/iterate", async (req, res) => {
       // 1) Reescribir la instrucción libre con gpt-4.1-nano
       const RAW_LIMIT = 300;
       const rawInstr = actionParam.length > RAW_LIMIT
-        ? actionParam.slice(0, RAW_LIMIT) + "…" 
+        ? actionParam.slice(0, RAW_LIMIT) + "…"
         : actionParam;
 
       const rewritePrompt = `
 You are an AI “style police” for ING’s illustration prompts.
 Given the user’s free-text instruction, rewrite it so that:
-- Nunca salga del estilo ING: humor ligero, formas geométricas simples sin contornos y detalles sutiles. Añade cierto tono de humor.
-- No mencione sombras, bordes complejos, texturas realistas ni ningún efecto que contradiga la “flat, vector-based” guideline.
-- Solo ajuste disposición o elementos pequeños de acuerdo al Brand Content.
+- Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details. Add a touch of humor.
+- Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the “flat, vector-based” guideline.
+- Retain the main object from the previous image.
 
-Cliente’s raw instruction:
+Client’s raw instruction:
 "${rawInstr.replace(/"/g, '\\"')}"
 
-Reescribe esa instrucción para que siga EXACTAMENTE las pautas above y nada más.
-Devuélvelo solo como texto limpio (sin explicaciones).
+Rewrite that instruction to follow EXACTLY the above guidelines—and nothing else.
+Return only the clean text (no explanations).
       `;
 
       const rewriteResponse = await openai.responses.create({
@@ -456,3 +456,5 @@ app.get("*", (_req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on port ${PORT}`));
+
+
