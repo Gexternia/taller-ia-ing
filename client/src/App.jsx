@@ -84,7 +84,7 @@ export default function App() {
       });
       const { suggestedTitle } = await res.json();
       const userTitle = window.prompt(
-        "¿Te gusta este título? Si quieres editarlo:", 
+        "¿Te gusta este título? Si quieres editarlo:",
         suggestedTitle
       );
       if (userTitle) {

@@ -51,6 +51,7 @@ const openai = new OpenAI({
 async function getObjectAsDataURL(bucketName, key) {
   const getCmd = new GetObjectCommand({ Bucket: bucketName, Key: key });
   const data   = await s3.send(getCmd);
+  // Convertir ReadableStream a Buffer
   const chunks = [];
   for await (const chunk of data.Body) {
     chunks.push(chunk);
@@ -257,9 +258,9 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
  *   1) Recibe previousResponseId + imageCallId + action (+ actionParam opcional).
  *   2) Para “suggest_title” se comporta igual que antes.
  *   3) Para “add_title”, “change_palette”, etc. → mapea la acción a texto.
- *   4) Para “chat” (action === "chat") → usa `actionParam` puro como prompt.
+ *   4) Para “chat” (action === "chat") → reescribe con gpt-4.1-nano y luego edita imagen.
  *   5) Llama a GPT‐4.1‐mini ENVIANDO SOLO { type:"image_generation_call", id:imageCallId }
- *      junto con el bloque de texto (nunca `previous_response_id` en el mismo request).
+ *      junto con el bloque de texto reescrito.
  *   6) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
  */
 app.post("/api/iterate", async (req, res) => {
@@ -275,6 +276,78 @@ app.post("/api/iterate", async (req, res) => {
       "prevResp:", previousResponseId,
       "callId:", imageCallId
     );
+
+    // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
+    if (action === "chat") {
+      if (!actionParam) {
+        console.warn("❌ /api/iterate chat without actionParam");
+        return res.status(400).json({ error: "chat requires a text parameter" });
+      }
+
+      // 1) Llamar a gpt-4.1-nano para reescribir el texto según pautas ING
+      const rewritePrompt = `
+You are an AI “style police” for ING’s illustration prompts.
+Given the user’s free-text instruction, rewrite it so that:
+- Nunca salga del estilo ING: humor ligero, formas geométricas simples sin contornos, color limpio y detalles sutiles.
+- No mencione sombras, bordes complejos, texturas realistas ni ningún efecto que contradiga la “flat, vector-based” guideline.
+- Solo ajuste tonos de color, disposición o elementos pequeños de acuerdo al Brand Content.
+
+Cliente’s raw instruction:
+"${actionParam.replace(/"/g, '\\"')}"
+
+Reescribe esa instrucción para que siga EXACTAMENTE las pautas above y nada más.
+Devuélvelo solo como texto limpio (sin explicaciones).
+      `;
+
+      const rewriteResponse = await openai.responses.create({
+        model: "gpt-4.1-nano",
+        input: [
+          { role: "user", content: rewritePrompt }
+        ]
+      });
+      const rewrittenRaw = rewriteResponse.output[0];
+      const rewrittenText = Array.isArray(rewrittenRaw.content)
+        ? rewrittenRaw.content.map(c => c.text || "").join(" ").trim()
+        : typeof rewrittenRaw.content === "string"
+          ? rewrittenRaw.content.trim()
+          : rewrittenRaw.content.text?.trim() || "";
+
+      console.log("   ▶[chat] Original user text:", actionParam);
+      console.log("   ▶[chat] Rewritten text:", rewrittenText);
+
+      // 2) Con el texto reescrito, hacer la llamada de edición de imagen
+      const itChat = await openai.responses.create({
+        model: "gpt-4.1-mini",
+        input: [
+          { role: "user", content: [{ type: "input_text", text: rewrittenText }] },
+          { type: "image_generation_call", id: imageCallId }
+        ],
+        tools: [{
+          type:       "image_generation",
+          background: "transparent",
+          size:       "auto",
+          quality:    "high"
+        }]
+      });
+      const callChat = itChat.output.find(o => o.type === "image_generation_call");
+      if (!callChat?.result) throw new Error("No image returned from chat iteration");
+      console.log("   ✅ [chat] iteration generated; new imageCallId=", callChat.id);
+
+      // 3) Guardar + subir a S3
+      const buf2Chat   = Buffer.from(callChat.result, "base64");
+      const fname2Chat = `${Date.now()}.png`;
+      const local2Chat = join(OUTPUT_DIR, fname2Chat);
+      await fs.writeFile(local2Chat, buf2Chat);
+      const key2Chat   = await uploadToS3(OUTPUT_CFG, local2Chat, fname2Chat);
+      console.log("   ✅ [chat] iteration uploaded:", key2Chat);
+
+      // 4) Responder con nuevo signedUrl, responseId e imageCallId
+      return res.json({
+        resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2Chat),
+        responseId:  itChat.id,
+        imageCallId: callChat.id
+      });
+    }
 
     // 1) Sugerir título con IA (igual que antes)
     if (action === "suggest_title") {
@@ -308,7 +381,7 @@ app.post("/api/iterate", async (req, res) => {
       add_title:      p => `Add the following title below the image: "${p}".`
     };
 
-    // 4) Si action === "chat", usamos actionParam directamente como prompt
+    // 4) Para los demás casos (no “chat”), usar mapeo o texto genérico
     const text =
       action === "chat"
         ? actionParam
@@ -334,7 +407,7 @@ app.post("/api/iterate", async (req, res) => {
     if (!call2?.result) throw new Error("No image returned from iteration");
     console.log("   ✅ iteration generated; new imageCallId=", call2.id);
 
-    // 6) Guardar + subir a S3
+    // 6) Guardar + subir a S3 (outputs)
     const buf2   = Buffer.from(call2.result, "base64");
     const fname2 = `${Date.now()}.png`;
     const local2 = join(OUTPUT_DIR, fname2);
