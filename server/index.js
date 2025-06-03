@@ -259,12 +259,12 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
  *   2) Para “suggest_title” se comporta igual que antes.
  *   3) Para “add_title”, “change_palette”, etc. → mapea la acción a texto.
  *   4) Para “chat”: 
- *       a) Recuperar URL de imagen anterior.
- *       b) Pedir a GPT-4o-mini mini-descripción del objeto principal.
- *       c) Reescribir la instrucción del usuario con GPT-4.1-nano (temperatura baja), incluyendo mini-descripción.
- *       d) Llamar a GPT-4.1-mini con:
+ *       a) Recupera URL de imagen anterior.
+ *       b) Pide a GPT-4o-mini una mini-descripción del objeto principal.
+ *       c) Reescribe la instrucción del usuario con GPT-4.1-nano (temperatura 0) incluyendo mini-descripción.
+ *       d) Llama a GPT-4.1-mini con:
  *          – bloque system recordando paleta ING,
- *          – texto reescrito,
+ *          – texto reescrito + mini-descripción,
  *          – input_image con URL anterior,
  *          – image_generation_call con id anterior.
  *   5) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
@@ -292,9 +292,9 @@ app.post("/api/iterate", async (req, res) => {
         console.warn("❌ /api/iterate chat without actionParam");
         return res.status(400).json({ error: "chat requires a text parameter" });
       }
-      if (!originalDescription) {
-        console.warn("❌ /api/iterate chat without originalDescription");
-        return res.status(400).json({ error: "originalDescription is required for chat" });
+      if (!originalDescription || !originalDescription.prevImageUrl) {
+        console.warn("❌ /api/iterate chat without originalDescription.prevImageUrl");
+        return res.status(400).json({ error: "originalDescription.prevImageUrl is required for chat" });
       }
       if (actionParam.length > CHAT_BACKEND_MAX) {
         return res.status(400).json({
@@ -306,20 +306,9 @@ app.post("/api/iterate", async (req, res) => {
 
     // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
     if (action === "chat") {
-      // a) Recuperar la URL de la imagen anterior
-      //    Para ello, buscamos en S3 el key que corresponde al último imageCallId.
-      //    Aquí asumimos que imageCallId se guarda en algún mapeo. En este ejemplo, 
-      //    simplificamos y asumimos que el cliente ya mandó un campo extra con la URL,
-      //    pero en tu implementación concreta, podrías guardar en BD el key con cada iteration.
-      //    Para mantenerlo simple, supondremos que el cliente envía un campo `prevImageUrl`.
-      //    Si no, habría que almacenar la relación imageCallId ↔ S3 key en memoria/registros.
-      const prevImageUrl = originalDescription.prevImageUrl; // si el cliente lo envía
-      if (!prevImageUrl) {
-        console.warn("❌ /api/iterate chat without prevImageUrl");
-        return res.status(400).json({ error: "prevImageUrl is required for chat" });
-      }
+      const prevImageUrl = originalDescription.prevImageUrl;
 
-      // b) Pedir a GPT-4o-mini una mini-descripción (100–150 caracteres) del objeto principal
+      // a) Pedir mini-descripción con GPT-4o-mini
       const vis = await openai.responses.create({
         model: "gpt-4o-mini",
         input: [{
@@ -339,7 +328,7 @@ app.post("/api/iterate", async (req, res) => {
           : visMsg.content.text?.trim() || "";
       console.log("   ▶ miniDesc:", miniDesc);
 
-      // c) Reescribir la instrucción libre con GPT-4.1-nano (temperatura baja)
+      // b) Reescribir la instrucción libre con GPT-4.1-nano
       const RAW_LIMIT = 150;
       const rawInstr = actionParam.length > RAW_LIMIT
         ? actionParam.slice(0, RAW_LIMIT) + "…"
@@ -376,19 +365,20 @@ Return only the rewritten instruction.
       console.log("   ▶[chat] Original user text:", actionParam);
       console.log("   ▶[chat] Rewritten text:", rewrittenText);
 
-      // d) Llamada a GPT-4.1-mini con:
-      //    – mensaje SYSTEM para paleta ING,
-      //    – texto reescrito,
-      //    – input_image con prevImageUrl,
-      //    – image_generation_call con id anterior
+      // c) Llamar a GPT-4.1-mini con el bloque SYSTEM, texto reescrito e input_image + image_generation_call
       const itChat = await openai.responses.create({
         model:       "gpt-4.1-mini",
         temperature: 0.1,
         input: [
           { role: "system", content:
               "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows." },
-          { role: "user", content: [{ type: "input_text", text: rewrittenText }] },
-          { type: "input_image", image_url: prevImageUrl },
+          {
+            role: "user",
+            content: [
+              { type: "input_text",  text: rewrittenText },
+              { type: "input_image", image_url: prevImageUrl }
+            ]
+          },
           { type: "image_generation_call", id: imageCallId }
         ],
         tools: [{
@@ -402,7 +392,7 @@ Return only the rewritten instruction.
       if (!callChat?.result) throw new Error("No image returned from chat iteration");
       console.log("   ✅ [chat] iteration generated; new imageCallId=", callChat.id);
 
-      // 3) Guardar + subir a S3
+      // d) Guardar + subir a S3
       const buf2Chat   = Buffer.from(callChat.result, "base64");
       const fname2Chat = `${Date.now()}.png`;
       const local2Chat = join(OUTPUT_DIR, fname2Chat);
@@ -410,7 +400,7 @@ Return only the rewritten instruction.
       const key2Chat   = await uploadToS3(OUTPUT_CFG, local2Chat, fname2Chat);
       console.log("   ✅ [chat] iteration uploaded:", key2Chat);
 
-      // 4) Obtener signed URL y responder
+      // e) Obtener signed URL y responder
       const newUrl = await signedUrl(OUTPUT_CFG.bucket, key2Chat);
       return res.json({
         resultUrl:   newUrl,
