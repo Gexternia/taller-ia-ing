@@ -17,6 +17,9 @@ export default function App() {
   const [showTitleOptions, setShowTitleOptions]   = useState(false);
   const [chatText, setChatText]                   = useState("");
 
+  // Límite de caracteres para el textarea de chat
+  const CHAT_MAX = 200;
+
   // --- Cámara / archivo -----------------------------------------------------
   async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -289,12 +292,21 @@ export default function App() {
             <div style={{ marginBottom: 16 }}>
               <textarea
                 rows={3}
-                style={{ width: "100%", marginBottom: 8 }}
+                style={{ width: "100%", marginBottom: 4 }}
                 placeholder="Escribe aquí la modificación que quieras aplicar..."
                 value={chatText}
                 onChange={(e) => setChatText(e.target.value)}
+                maxLength={CHAT_MAX}
                 disabled={isGenerating}
               />
+              <div
+                style={{
+                  fontSize: 12,
+                  color: chatText.length > CHAT_MAX * 0.9 ? "red" : "#555"
+                }}
+              >
+                {chatText.length} / {CHAT_MAX} caracteres
+              </div>
               <button
                 onClick={() => {
                   iterate("chat", chatText);

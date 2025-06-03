@@ -51,7 +51,7 @@ const openai = new OpenAI({
 async function getObjectAsDataURL(bucketName, key) {
   const getCmd = new GetObjectCommand({ Bucket: bucketName, Key: key });
   const data   = await s3.send(getCmd);
-  // Convertir ReadableStream a Buffer
+  // data.Body es un ReadableStream; lo convertimos a Buffer:
   const chunks = [];
   for await (const chunk of data.Body) {
     chunks.push(chunk);
@@ -138,7 +138,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-/** 
+/**
  * POST /api/generate
  *   1) Recibe una imagen.
  *   2) GPT-4o‐mini describe (hasta 1000 caracteres, con posiciones e interpretación).
@@ -277,23 +277,38 @@ app.post("/api/iterate", async (req, res) => {
       "callId:", imageCallId
     );
 
-    // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
+    // --------------- Validación de longitud en backend ---------------
+    const CHAT_BACKEND_MAX = 250;
     if (action === "chat") {
       if (!actionParam) {
         console.warn("❌ /api/iterate chat without actionParam");
         return res.status(400).json({ error: "chat requires a text parameter" });
       }
+      if (actionParam.length > CHAT_BACKEND_MAX) {
+        return res.status(400).json({
+          error: `Instrucción demasiado larga: máximo ${CHAT_BACKEND_MAX} caracteres.`
+        });
+      }
+    }
+    // ------------------------------------------------------------------
 
-      // 1) Llamar a gpt-4.1-nano para reescribir el texto según pautas ING
+    // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
+    if (action === "chat") {
+      // 1) Reescribir la instrucción libre con gpt-4.1-nano
+      const RAW_LIMIT = 300;
+      const rawInstr = actionParam.length > RAW_LIMIT
+        ? actionParam.slice(0, RAW_LIMIT) + "…" 
+        : actionParam;
+
       const rewritePrompt = `
 You are an AI “style police” for ING’s illustration prompts.
 Given the user’s free-text instruction, rewrite it so that:
-- Nunca salga del estilo ING: humor ligero, formas geométricas simples sin contornos, color limpio y detalles sutiles.
+- Nunca salga del estilo ING: humor ligero, formas geométricas simples sin contornos y detalles sutiles. Añade cierto tono de humor.
 - No mencione sombras, bordes complejos, texturas realistas ni ningún efecto que contradiga la “flat, vector-based” guideline.
-- Solo ajuste tonos de color, disposición o elementos pequeños de acuerdo al Brand Content.
+- Solo ajuste disposición o elementos pequeños de acuerdo al Brand Content.
 
 Cliente’s raw instruction:
-"${actionParam.replace(/"/g, '\\"')}"
+"${rawInstr.replace(/"/g, '\\"')}"
 
 Reescribe esa instrucción para que siga EXACTAMENTE las pautas above y nada más.
 Devuélvelo solo como texto limpio (sin explicaciones).
