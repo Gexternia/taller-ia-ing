@@ -168,7 +168,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
           {
             type: "input_text",
             text:
-              "You are a famous ilustrator, and your role here is to analyze some pieces of homemade art craft ideas" +
+              "You are a graphic designer, and your role here is to analyze some pieces of homemade art craft ideas" +
               "Describe what you see in this image in up to 250 characters " +
               "as an interpretation —not focusing on materials or style— of what the user wanted to represent " +
               "make sure to include positions of all objects in the image."
@@ -196,8 +196,9 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     // 4) Construir prompt textual base
     const promptText =
       `Generate a flat, vector-based icon illustration on a transparent background. ` +
-      `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. `of ${description}`` +
-      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style):`      ;
+      `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
+      `${description}` +
+      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style)` ;
 
     console.log("   ▶ prompt:", promptText);
 
