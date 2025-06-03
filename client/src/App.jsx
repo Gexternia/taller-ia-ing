@@ -11,14 +11,14 @@ export default function App() {
   const [brandRefs, setBrandRefs]       = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Guardamos la descripción original para pasársela al “chat”
+  const [originalDescription, setOriginalDescription] = useState("");
+
   // Control de sub‐menús
   const [showColorOptions, setShowColorOptions]   = useState(false);
   const [showChatBox, setShowChatBox]             = useState(false);
   const [showTitleOptions, setShowTitleOptions]   = useState(false);
   const [chatText, setChatText]                   = useState("");
-
-  // Límite de caracteres para el textarea de chat
-  const CHAT_MAX = 200;
 
   // --- Cámara / archivo -----------------------------------------------------
   async function startCamera() {
@@ -44,6 +44,7 @@ export default function App() {
       return;
     }
     setIsGenerating(true);
+
     // Limpiar todos los estados de iteración
     setResultUrl(null);
     setResponseId(null);
@@ -52,6 +53,7 @@ export default function App() {
     setShowColorOptions(false);
     setShowChatBox(false);
     setShowTitleOptions(false);
+    setOriginalDescription("");
 
     const form = new FormData();
     form.append("image", captured, "input.png");
@@ -59,10 +61,17 @@ export default function App() {
     const res  = await fetch("/api/generate", { method: "POST", body: form });
     const data = await res.json();
 
+    if (data.error) {
+      alert("Error al generar: " + data.error);
+      setIsGenerating(false);
+      return;
+    }
+
     setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
     setImageCallId(data.imageCallId);
     setBrandRefs(data.brandRefs || []);
+    setOriginalDescription(data.description || ""); // <--- guardamos la descripción original
     setIsGenerating(false);
   }
 
@@ -82,10 +91,16 @@ export default function App() {
         body: JSON.stringify({
           previousResponseId: responseId,
           imageCallId,
-          action
+          action,
+          originalDescription  // <--- lo enviamos, aunque no se use en suggest_title
         })
       });
-      const { suggestedTitle } = await res.json();
+      const { suggestedTitle, error } = await res.json();
+      if (error) {
+        alert("Error: " + error);
+        setIsGenerating(false);
+        return;
+      }
       const userTitle = window.prompt(
         "¿Te gusta este título? Si quieres editarlo:",
         suggestedTitle
@@ -119,7 +134,8 @@ export default function App() {
     const payload = {
       previousResponseId: responseId,
       imageCallId,
-      action
+      action,
+      originalDescription  // <--- absolut. requerido si action === "chat"
     };
     if (param) payload.actionParam = param;
 
@@ -129,6 +145,12 @@ export default function App() {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+
+    if (data.error) {
+      alert("Error en iteración: " + data.error);
+      setIsGenerating(false);
+      return;
+    }
 
     setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
@@ -292,21 +314,13 @@ export default function App() {
             <div style={{ marginBottom: 16 }}>
               <textarea
                 rows={3}
-                style={{ width: "100%", marginBottom: 4 }}
+                maxLength={250}  // límite en frontend para no enviar textos demasiado largos
+                style={{ width: "100%", marginBottom: 8 }}
                 placeholder="Escribe aquí la modificación que quieras aplicar..."
                 value={chatText}
                 onChange={(e) => setChatText(e.target.value)}
-                maxLength={CHAT_MAX}
                 disabled={isGenerating}
               />
-              <div
-                style={{
-                  fontSize: 12,
-                  color: chatText.length > CHAT_MAX * 0.9 ? "red" : "#555"
-                }}
-              >
-                {chatText.length} / {CHAT_MAX} caracteres
-              </div>
               <button
                 onClick={() => {
                   iterate("chat", chatText);
@@ -317,6 +331,9 @@ export default function App() {
               >
                 Enviar modificación
               </button>
+              <div style={{ fontSize: 12, color: "#666" }}>
+                ({chatText.length}/250 caracteres)
+              </div>
             </div>
           )}
 

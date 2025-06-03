@@ -148,7 +148,7 @@ const upload = multer({ storage });
  *        • promptText
  *        • 5 Data URLs
  *   6) Guarda imagen resultante y sube a S3.
- *   7) Devuelve resultUrl, brandRefs, responseId e imageCallId.
+ *   7) Devuelve resultUrl, brandRefs, description, responseId e imageCallId.
  */
 app.post("/api/generate", upload.single("image"), async (req, res) => {
   try {
@@ -169,8 +169,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
             type: "input_text",
             text:
               "Describe what you see in this image in up to 1000 characters " +
-              "as an interpretation—not focusing on materials—" +
-              "but including positions (e.g., 'The lion is centered, facing right; behind it is a sunset on the left, trees on the right')."
+              "as an interpretation —not focusing on materials or style— " +
+              "but including precise positions of all objects (e.g., 'The compass is centered, with a circular dial and a red needle pointing north; background white')."
           }
         ]
       }]
@@ -240,10 +240,11 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       url:   refDataURLs[i]
     }));
 
-    // 9) Responder al cliente con todo
+    // 9) Responder al cliente con todo, incluyendo la descripción
     return res.json({
       resultUrl,
       brandRefs,
+      description,           // <--- enviamos la descripción original
       responseId:  gen.id,
       imageCallId: call.id
     });
@@ -255,17 +256,17 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 
 /**
  * POST /api/iterate
- *   1) Recibe previousResponseId + imageCallId + action (+ actionParam opcional).
+ *   1) Recibe previousResponseId + imageCallId + action (+ actionParam opcional) + originalDescription.
  *   2) Para “suggest_title” se comporta igual que antes.
  *   3) Para “add_title”, “change_palette”, etc. → mapea la acción a texto.
- *   4) Para “chat” (action === "chat") → reescribe con gpt-4.1-nano y luego edita imagen.
+ *   4) Para “chat” (action === "chat") → reescribe con gpt-4.1-nano usando originalDescription y luego edita imagen.
  *   5) Llama a GPT‐4.1‐mini ENVIANDO SOLO { type:"image_generation_call", id:imageCallId }
  *      junto con el bloque de texto reescrito.
  *   6) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
  */
 app.post("/api/iterate", async (req, res) => {
   try {
-    const { previousResponseId, imageCallId, action, actionParam } = req.body;
+    const { previousResponseId, imageCallId, action, actionParam, originalDescription } = req.body;
     if (!previousResponseId || !imageCallId) {
       console.warn("❌ /api/iterate: missing previousResponseId or imageCallId");
       return res.status(400).json({ error: "Missing previousResponseId or imageCallId" });
@@ -289,29 +290,34 @@ app.post("/api/iterate", async (req, res) => {
           error: `Instrucción demasiado larga: máximo ${CHAT_BACKEND_MAX} caracteres.`
         });
       }
+      if (!originalDescription) {
+        console.warn("❌ /api/iterate chat without originalDescription");
+        return res.status(400).json({ error: "Missing originalDescription for chat" });
+      }
     }
     // ------------------------------------------------------------------
 
     // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
     if (action === "chat") {
-      // 1) Reescribir la instrucción libre con gpt-4.1-nano
+      // 1) Truncar raw instrucción si pasa RAW_LIMIT
       const RAW_LIMIT = 300;
       const rawInstr = actionParam.length > RAW_LIMIT
         ? actionParam.slice(0, RAW_LIMIT) + "…"
         : actionParam;
 
+      // 2) Construir prompt de reescritura incluyendo originalDescription
       const rewritePrompt = `
 You are an AI “style police” for ING’s illustration prompts.
-Given the user’s free-text instruction, rewrite it so that:
+Given:
+1) A brief description of the current illustration: "${originalDescription.replace(/"/g, '\\"')}"
+2) The user’s free-text instruction: "${rawInstr.replace(/"/g, '\\"')}"
+
+Rewrite the user’s instruction so that:
 - Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details. Add a touch of humor.
 - Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the “flat, vector-based” guideline.
-- Retain the main object from the previous image.
+- Conserve the MAIN OBJECT (as described above) and adjust only small details or disposition based on the user’s request.
 
-Client’s raw instruction:
-"${rawInstr.replace(/"/g, '\\"')}"
-
-Rewrite that instruction to follow EXACTLY the above guidelines—and nothing else.
-Return only the clean text (no explanations).
+Return only the clean rewritten instruction (no explanations, no extra commentary).
       `;
 
       const rewriteResponse = await openai.responses.create({
@@ -330,7 +336,7 @@ Return only the clean text (no explanations).
       console.log("   ▶[chat] Original user text:", actionParam);
       console.log("   ▶[chat] Rewritten text:", rewrittenText);
 
-      // 2) Con el texto reescrito, hacer la llamada de edición de imagen
+      // 3) Con el texto reescrito, hacer la llamada de edición de imagen
       const itChat = await openai.responses.create({
         model: "gpt-4.1-mini",
         input: [
@@ -348,7 +354,7 @@ Return only the clean text (no explanations).
       if (!callChat?.result) throw new Error("No image returned from chat iteration");
       console.log("   ✅ [chat] iteration generated; new imageCallId=", callChat.id);
 
-      // 3) Guardar + subir a S3
+      // 4) Guardar + subir a S3
       const buf2Chat   = Buffer.from(callChat.result, "base64");
       const fname2Chat = `${Date.now()}.png`;
       const local2Chat = join(OUTPUT_DIR, fname2Chat);
@@ -356,7 +362,7 @@ Return only the clean text (no explanations).
       const key2Chat   = await uploadToS3(OUTPUT_CFG, local2Chat, fname2Chat);
       console.log("   ✅ [chat] iteration uploaded:", key2Chat);
 
-      // 4) Responder con nuevo signedUrl, responseId e imageCallId
+      // 5) Responder con nuevo signedUrl, responseId e imageCallId
       return res.json({
         resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2Chat),
         responseId:  itChat.id,
@@ -396,7 +402,7 @@ Return only the clean text (no explanations).
       add_title:      p => `Add the following title below the image: "${p}".`
     };
 
-    // 4) Para los demás casos (no “chat”), usar mapeo o texto genérico
+    // 4) Para los demás casos (no “chat”), usar el mapeo o texto genérico
     const text =
       action === "chat"
         ? actionParam
@@ -456,5 +462,6 @@ app.get("*", (_req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on port ${PORT}`));
+
 
 
