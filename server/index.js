@@ -196,9 +196,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     // 4) Construir prompt textual base
     const promptText =
       `Generate a flat, vector-based icon illustration on a transparent background. ` +
-      `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
-      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style):` +
-      `of ${description}`;
+      `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. `of ${description}`` +
+      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style):`      ;
 
     console.log("   ▶ prompt:", promptText);
 
