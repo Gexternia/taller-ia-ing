@@ -51,7 +51,7 @@ const openai = new OpenAI({
 async function getObjectAsDataURL(bucketName, key) {
   const getCmd = new GetObjectCommand({ Bucket: bucketName, Key: key });
   const data   = await s3.send(getCmd);
-  // data.Body es un ReadableStream; lo convertimos a Buffer:
+  // Convertir ReadableStream a Buffer
   const chunks = [];
   for await (const chunk of data.Body) {
     chunks.push(chunk);
@@ -141,12 +141,10 @@ const upload = multer({ storage });
 /**
  * POST /api/generate
  *   1) Recibe una imagen.
- *   2) GPT-4o‐mini describe (hasta 1000 caracteres, con posiciones e interpretación).
+ *   2) GPT-4o‐mini describe (hasta 250 caracteres) con posiciones e interpretación.
  *   3) Selecciona 5 referencias (top 5 por embedding).
  *   4) Lee cada referencia desde S3 → Data URL.
- *   5) GPT‐4.1‐mini (image_generation) recibe:
- *        • promptText
- *        • 5 Data URLs
+ *   5) GPT‐4.1‐mini (image_generation) recibe promptText + 5 Data URLs.
  *   6) Guarda imagen resultante y sube a S3.
  *   7) Devuelve resultUrl, brandRefs, description, responseId e imageCallId.
  */
@@ -158,7 +156,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     }
     console.log("➡️ /api/generate");
 
-    // 1) Descripción con GPT-4o‐mini
+    // 1) Descripción con GPT-4o‐mini (hasta 250 caracteres)
     const vision = await openai.responses.create({
       model: "gpt-4o-mini",
       input: [{
@@ -168,10 +166,9 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
           {
             type: "input_text",
             text:
-              "You are a graphic designer, and your role here is to analyze some pieces of homemade art craft ideas" +
-              "Describe what you see in this image in up to 250 characters " +
-              "as an interpretation —not focusing on materials or style— of what the user wanted to represent " +
-              "make sure to include positions of all objects in the image."
+              "You are a graphic designer. Describe what you see in this image in up to 250 characters, " +
+              "as an interpretation—without enfocarse en materiales o estilo—de lo que el usuario quería representar. " +
+              "Incluye posiciones de todos los objetos."
           }
         ]
       }]
@@ -193,18 +190,18 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       refs.map(r => getObjectAsDataURL(BRAND_CFG.bucket, r.key))
     );
 
-    // 4) Construir prompt textual base
+    // 4) Construir prompt textual base (con inventario de elementos)
     const promptText =
-      `Generate a flat, vector-based icon illustration on a transparent background. ` +
-      `Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. ` +
-      `${description}` +
-      `Use the following reference images to repeat the exact style (do not paste materials, just imitate style)` ;
-
+      "Generate a flat, vector-based icon illustration on a transparent background. " +
+      "Follow this illustration style: light-hearted humor, simple geometric shapes without strokes, subtle unique details. " +
+      "The image must contain exactly: " + description + ". " +
+      "Use the following reference images to repeat the exact style (do not paste materials, just imitate style):";
     console.log("   ▶ prompt:", promptText);
 
-    // 5) Llamada a GPT‐4.1‐mini (image_generation)
+    // 5) Llamada a GPT‐4.1‐mini (image_generation) con temperatura baja
     const gen = await openai.responses.create({
-      model: "gpt-4.1-mini",
+      model:       "gpt-4.1-mini",
+      temperature: 0.1,
       input: [{
         role: "user",
         content: [
@@ -246,7 +243,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     return res.json({
       resultUrl,
       brandRefs,
-      description,              // <-- enviamos la descripción original aquí
+      description,      // enviamos la descripción original aquí
       responseId:  gen.id,
       imageCallId: call.id
     });
@@ -261,10 +258,16 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
  *   1) Recibe previousResponseId + imageCallId + action (+ actionParam opcional) + originalDescription.
  *   2) Para “suggest_title” se comporta igual que antes.
  *   3) Para “add_title”, “change_palette”, etc. → mapea la acción a texto.
- *   4) Para “chat” (action === "chat") → reescribe con gpt-4.1-nano usando originalDescription y luego edita imagen.
- *   5) Llama a GPT‐4.1‐mini ENVIANDO SOLO { type:"image_generation_call", id:imageCallId }
- *      junto con el bloque de texto reescrito.
- *   6) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
+ *   4) Para “chat”: 
+ *       a) Recuperar URL de imagen anterior.
+ *       b) Pedir a GPT-4o-mini mini-descripción del objeto principal.
+ *       c) Reescribir la instrucción del usuario con GPT-4.1-nano (temperatura baja), incluyendo mini-descripción.
+ *       d) Llamar a GPT-4.1-mini con:
+ *          – bloque system recordando paleta ING,
+ *          – texto reescrito,
+ *          – input_image con URL anterior,
+ *          – image_generation_call con id anterior.
+ *   5) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
  */
 app.post("/api/iterate", async (req, res) => {
   try {
@@ -303,31 +306,63 @@ app.post("/api/iterate", async (req, res) => {
 
     // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
     if (action === "chat") {
-      // 1) Reescribir la instrucción libre con gpt-4.1-nano
-      const RAW_LIMIT = 300;
+      // a) Recuperar la URL de la imagen anterior
+      //    Para ello, buscamos en S3 el key que corresponde al último imageCallId.
+      //    Aquí asumimos que imageCallId se guarda en algún mapeo. En este ejemplo, 
+      //    simplificamos y asumimos que el cliente ya mandó un campo extra con la URL,
+      //    pero en tu implementación concreta, podrías guardar en BD el key con cada iteration.
+      //    Para mantenerlo simple, supondremos que el cliente envía un campo `prevImageUrl`.
+      //    Si no, habría que almacenar la relación imageCallId ↔ S3 key en memoria/registros.
+      const prevImageUrl = originalDescription.prevImageUrl; // si el cliente lo envía
+      if (!prevImageUrl) {
+        console.warn("❌ /api/iterate chat without prevImageUrl");
+        return res.status(400).json({ error: "prevImageUrl is required for chat" });
+      }
+
+      // b) Pedir a GPT-4o-mini una mini-descripción (100–150 caracteres) del objeto principal
+      const vis = await openai.responses.create({
+        model: "gpt-4o-mini",
+        input: [{
+          role: "user",
+          content: [
+            { type: "input_image", image_url: prevImageUrl },
+            { type: "input_text", text:
+                "Resume en 150 caracteres la forma, posición y detalles geométricos del objeto principal en esta imagen, sin mencionar estilo ni colores." }
+          ]
+        }]
+      });
+      const visMsg = vis.output[0];
+      const miniDesc = Array.isArray(visMsg.content)
+        ? visMsg.content.map(c => c.text || "").join(" ").trim()
+        : typeof visMsg.content === "string"
+          ? visMsg.content.trim()
+          : visMsg.content.text?.trim() || "";
+      console.log("   ▶ miniDesc:", miniDesc);
+
+      // c) Reescribir la instrucción libre con GPT-4.1-nano (temperatura baja)
+      const RAW_LIMIT = 150;
       const rawInstr = actionParam.length > RAW_LIMIT
         ? actionParam.slice(0, RAW_LIMIT) + "…"
         : actionParam;
 
-      // Ahora incluimos originalDescription para asegurarnos de que el “main object” permanece igual
       const rewritePrompt = `
-You are an AI style police for illustration prompts.
-Given the user’s free-text instruction and the original description of the previous image, rewrite it so that:
+You are an AI style police for ING’s illustration prompts.
+Previous image shows: "${miniDesc}".
+Rewrite the user’s instruction so that:
 - Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details.
 - Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the flat and vector-based guideline.
-- Keep the same main object that appeared in the previous image: "${originalDescription}".
-- It is important to matain consistency.
-- Limit your answers below 250 characters.
+- Keep the same main object exactly as described: "${miniDesc}".
+- Limit your answer to under 200 characters, only rewriting the instruction (no explanations).
 
 Client’s raw instruction:
 "${rawInstr.replace(/"/g, '\\"')}"
 
-Rewrite that instruction to follow EXACTLY the above guidelines —and nothing else.
-Return only the clean text (no explanations).
-      `;
+Return only the rewritten instruction.
+      `.trim();
 
       const rewriteResponse = await openai.responses.create({
-        model: "gpt-4.1-nano",
+        model:       "gpt-4.1-nano",
+        temperature: 0.0,
         input: [
           { role: "user", content: rewritePrompt }
         ]
@@ -338,15 +373,22 @@ Return only the clean text (no explanations).
         : typeof rewrittenRaw.content === "string"
           ? rewrittenRaw.content.trim()
           : rewrittenRaw.content.text?.trim() || "";
-
       console.log("   ▶[chat] Original user text:", actionParam);
       console.log("   ▶[chat] Rewritten text:", rewrittenText);
 
-      // 2) Con el texto reescrito, hacer la llamada de edición de imagen
+      // d) Llamada a GPT-4.1-mini con:
+      //    – mensaje SYSTEM para paleta ING,
+      //    – texto reescrito,
+      //    – input_image con prevImageUrl,
+      //    – image_generation_call con id anterior
       const itChat = await openai.responses.create({
-        model: "gpt-4.1-mini",
+        model:       "gpt-4.1-mini",
+        temperature: 0.1,
         input: [
+          { role: "system", content:
+              "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows." },
           { role: "user", content: [{ type: "input_text", text: rewrittenText }] },
+          { type: "input_image", image_url: prevImageUrl },
           { type: "image_generation_call", id: imageCallId }
         ],
         tools: [{
@@ -368,9 +410,10 @@ Return only the clean text (no explanations).
       const key2Chat   = await uploadToS3(OUTPUT_CFG, local2Chat, fname2Chat);
       console.log("   ✅ [chat] iteration uploaded:", key2Chat);
 
-      // 4) Responder con nuevo signedUrl, responseId e imageCallId
+      // 4) Obtener signed URL y responder
+      const newUrl = await signedUrl(OUTPUT_CFG.bucket, key2Chat);
       return res.json({
-        resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2Chat),
+        resultUrl:   newUrl,
         responseId:  itChat.id,
         imageCallId: callChat.id
       });
@@ -398,7 +441,7 @@ Return only the clean text (no explanations).
       return res.status(400).json({ error: "add_title requires a text parameter" });
     }
 
-    // 3) Mapear las acciones conocidas
+    // 3) Mapear las acciones conocidas (para cambios “no chat”)
     const templates = {
       change_palette: p => `Change color palette to ${p}.`,
       scale_up:       () => `Increase the size of the main object.`,
@@ -408,18 +451,20 @@ Return only the clean text (no explanations).
       add_title:      p => `Add the following title below the image: "${p}".`
     };
 
-    // 4) Para los demás casos (no “chat”), usar mapeo o texto genérico
-    const text =
-      action === "chat"
-        ? actionParam
-        : (templates[action]?.(actionParam) || `Apply modification: ${action}.`);
-
+    // 4) Text para iteraciones no-chat
+    const text = action === "chat"
+      ? actionParam
+      : (templates[action]?.(actionParam) || `Apply modification: ${action}.`);
     console.log("   ▶ iteration prompt:", text);
 
-    // 5) Llamada multi-turn de edición (sin previous_response_id)
+    // 5) Llamada multi-turn de edición (no “chat”), con temperatura baja
     const it = await openai.responses.create({
-      model: "gpt-4.1-mini",
+      model:       "gpt-4.1-mini",
+      temperature: 0.1,
       input: [
+        // Recordatorio al modelo de estilo ING
+        { role: "system", content:
+            "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows." },
         { role: "user", content: [{ type: "input_text", text }] },
         { type: "image_generation_call", id: imageCallId }
       ],
@@ -442,9 +487,10 @@ Return only the clean text (no explanations).
     const key2   = await uploadToS3(OUTPUT_CFG, local2, fname2);
     console.log("   ✅ iteration uploaded:", key2);
 
-    // 7) Responder con nuevo signedUrl, responseId e imageCallId
+    // 7) Obtener signed URL y responder
+    const newUrl = await signedUrl(OUTPUT_CFG.bucket, key2);
     return res.json({
-      resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2),
+      resultUrl:   newUrl,
       responseId:  it.id,
       imageCallId: call2.id
     });
@@ -468,7 +514,3 @@ app.get("*", (_req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on port ${PORT}`));
-
-
-
-

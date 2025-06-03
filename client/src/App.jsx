@@ -11,8 +11,9 @@ export default function App() {
   const [brandRefs, setBrandRefs]       = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Guardamos la descripción original para pasársela al “chat”
+  // Guardamos la descripción original y la URL de la imagen para pasárselas al “chat”
   const [originalDescription, setOriginalDescription] = useState("");
+  const [prevImageUrl, setPrevImageUrl]               = useState("");
 
   // Control de sub‐menús
   const [showColorOptions, setShowColorOptions]   = useState(false);
@@ -54,6 +55,7 @@ export default function App() {
     setShowChatBox(false);
     setShowTitleOptions(false);
     setOriginalDescription("");
+    setPrevImageUrl("");
 
     const form = new FormData();
     form.append("image", captured, "input.png");
@@ -71,7 +73,8 @@ export default function App() {
     setResponseId(data.responseId);
     setImageCallId(data.imageCallId);
     setBrandRefs(data.brandRefs || []);
-    setOriginalDescription(data.description || ""); // <--- guardamos la descripción original
+    setOriginalDescription(data.description || "");
+    setPrevImageUrl(data.resultUrl); // Guardamos la URL de la imagen inicial
     setIsGenerating(false);
   }
 
@@ -93,7 +96,7 @@ export default function App() {
           previousResponseId: responseId,
           imageCallId,
           action,
-          originalDescription  // <--- lo enviamos, aunque no se use en suggest_title
+          originalDescription: { text: originalDescription, prevImageUrl }
         })
       });
       const { suggestedTitle, error } = await res.json();
@@ -136,7 +139,7 @@ export default function App() {
       previousResponseId: responseId,
       imageCallId,
       action,
-      originalDescription  // <--- absolut. requerido si action === "chat"
+      originalDescription: { text: originalDescription, prevImageUrl }
     };
     if (param) payload.actionParam = param;
 
@@ -153,9 +156,11 @@ export default function App() {
       return;
     }
 
+    // Actualizar con la nueva URL y guardar para la próxima iteración
     setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
     setImageCallId(data.imageCallId);
+    setPrevImageUrl(data.resultUrl);
     setIsGenerating(false);
   }
 
