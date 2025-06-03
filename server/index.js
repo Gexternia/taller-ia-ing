@@ -202,7 +202,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     // 5) Llamada a GPT‐4.1‐mini (image_generation) con temperatura baja
     const gen = await openai.responses.create({
       model:       "gpt-4.1-mini",
-      temperature: 0.1,
+      temperature: 0.4,
       input: [{
         role: "user",
         content: [
@@ -368,7 +368,7 @@ Client’s raw instruction:
 
       const rewriteResponse = await openai.responses.create({
         model:       "gpt-4.1-nano",
-        temperature: 0.0,
+        temperature: 0.3,
         input: [
           { role: "user", content: rewritePrompt }
         ]
@@ -385,7 +385,7 @@ Client’s raw instruction:
       // 4) Llamar a GPT-4.1-mini con el bloque SYSTEM, reescrito e input_image (Data URL) + image_generation_call
       const itChat = await openai.responses.create({
         model:       "gpt-4.1-mini",
-        temperature: 0.1,
+        temperature: 0.3,
         input: [
           {
             role: "system",
@@ -470,7 +470,7 @@ Client’s raw instruction:
     // 5) Llamada multi-turn de edición (no “chat”), con temperatura baja
     const it = await openai.responses.create({
       model:       "gpt-4.1-mini",
-      temperature: 0.1,
+      temperature: 0.4,
       input: [
         // Recordatorio al modelo de estilo ING
         {
