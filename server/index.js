@@ -6,6 +6,7 @@ import { dirname, join, extname, basename } from "path";
 import { config as dotenvConfig } from "dotenv";
 import fs from "fs/promises";
 import mime from "mime-types";
+import fetch from "node-fetch"; // Para descargar la imagen firmada
 import {
   S3Client,
   PutObjectCommand,
@@ -167,8 +168,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
             type: "input_text",
             text:
               "You are a graphic designer. Describe what you see in this image in up to 250 characters, " +
-              "as an interpretation—without enfocarse en materiales o estilo—de lo que el usuario quería representar. " +
-              "Incluye posiciones de todos los objetos."
+              "as an interpretation—without focusing on materials or style—of what the user wanted to represent. " +
+              "Include positions of all objects."
           }
         ]
       }]
@@ -259,13 +260,13 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
  *   2) Para “suggest_title” se comporta igual que antes.
  *   3) Para “add_title”, “change_palette”, etc. → mapea la acción a texto.
  *   4) Para “chat”: 
- *       a) Recupera URL de imagen anterior.
- *       b) Pide a GPT-4o-mini una mini-descripción del objeto principal.
+ *       a) Descarga la imagen anterior (prevImageUrl) y la convierte a Data URL.
+ *       b) Pide a GPT-4o-mini una mini-descripción del objeto principal (150 caracteres).
  *       c) Reescribe la instrucción del usuario con GPT-4.1-nano (temperatura 0) incluyendo mini-descripción.
  *       d) Llama a GPT-4.1-mini con:
  *          – bloque system recordando paleta ING,
- *          – texto reescrito + mini-descripción,
- *          – input_image con URL anterior,
+ *          – texto reescrito,
+ *          – input_image con Data URL de la imagen previa,
  *          – image_generation_call con id anterior.
  *   5) Sube la imagen nueva a S3 y devuelve signed URL, responseId e imageCallId.
  */
@@ -292,9 +293,14 @@ app.post("/api/iterate", async (req, res) => {
         console.warn("❌ /api/iterate chat without actionParam");
         return res.status(400).json({ error: "chat requires a text parameter" });
       }
-      if (!originalDescription || !originalDescription.prevImageUrl) {
+      if (
+        !originalDescription ||
+        typeof originalDescription.prevImageUrl !== "string"
+      ) {
         console.warn("❌ /api/iterate chat without originalDescription.prevImageUrl");
-        return res.status(400).json({ error: "originalDescription.prevImageUrl is required for chat" });
+        return res.status(400).json({
+          error: "originalDescription.prevImageUrl is required for chat"
+        });
       }
       if (actionParam.length > CHAT_BACKEND_MAX) {
         return res.status(400).json({
@@ -306,17 +312,30 @@ app.post("/api/iterate", async (req, res) => {
 
     // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
     if (action === "chat") {
+      // 1) Descarga la imagen previa desde S3 (prevImageUrl) y conviértela a Data URL
       const prevImageUrl = originalDescription.prevImageUrl;
+      // Usamos fetch para descargar la imagen de la URL firmada
+      const respRaw = await fetch(prevImageUrl);
+      if (!respRaw.ok) {
+        throw new Error("No se pudo descargar la imagen previa desde S3");
+      }
+      const arrayBuf = await respRaw.arrayBuffer();
+      const bufPrev  = Buffer.from(arrayBuf);
+      // Asumimos PNG, pero podrías detectar por extensión
+      const dataURLPrev = `data:image/png;base64,${bufPrev.toString("base64")}`;
 
-      // a) Pedir mini-descripción con GPT-4o-mini
+      // 2) Pedir mini-descripción del objeto principal con GPT-4o-mini (150 caracteres)
       const vis = await openai.responses.create({
         model: "gpt-4o-mini",
         input: [{
           role: "user",
           content: [
-            { type: "input_image", image_url: prevImageUrl },
-            { type: "input_text", text:
-                "Resume en 150 caracteres la forma, posición y detalles geométricos del objeto principal en esta imagen, sin mencionar estilo ni colores." }
+            { type: "input_image", image_url: dataURLPrev },
+            {
+              type: "input_text",
+              text:
+                "Resume en 150 caracteres la forma, posición y detalles geométricos del objeto principal en esta imagen, sin mencionar estilo ni colores."
+            }
           ]
         }]
       });
@@ -328,7 +347,7 @@ app.post("/api/iterate", async (req, res) => {
           : visMsg.content.text?.trim() || "";
       console.log("   ▶ miniDesc:", miniDesc);
 
-      // b) Reescribir la instrucción libre con GPT-4.1-nano
+      // 3) Reescribir la instrucción libre con GPT-4.1-nano (temperatura 0)
       const RAW_LIMIT = 150;
       const rawInstr = actionParam.length > RAW_LIMIT
         ? actionParam.slice(0, RAW_LIMIT) + "…"
@@ -345,8 +364,6 @@ Rewrite the user’s instruction so that:
 
 Client’s raw instruction:
 "${rawInstr.replace(/"/g, '\\"')}"
-
-Return only the rewritten instruction.
       `.trim();
 
       const rewriteResponse = await openai.responses.create({
@@ -365,18 +382,21 @@ Return only the rewritten instruction.
       console.log("   ▶[chat] Original user text:", actionParam);
       console.log("   ▶[chat] Rewritten text:", rewrittenText);
 
-      // c) Llamar a GPT-4.1-mini con el bloque SYSTEM, texto reescrito e input_image + image_generation_call
+      // 4) Llamar a GPT-4.1-mini con el bloque SYSTEM, reescrito e input_image (Data URL) + image_generation_call
       const itChat = await openai.responses.create({
         model:       "gpt-4.1-mini",
         temperature: 0.1,
         input: [
-          { role: "system", content:
-              "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows." },
+          {
+            role: "system",
+            content:
+              "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows."
+          },
           {
             role: "user",
             content: [
               { type: "input_text",  text: rewrittenText },
-              { type: "input_image", image_url: prevImageUrl }
+              { type: "input_image", image_url: dataURLPrev }
             ]
           },
           { type: "image_generation_call", id: imageCallId }
@@ -392,7 +412,7 @@ Return only the rewritten instruction.
       if (!callChat?.result) throw new Error("No image returned from chat iteration");
       console.log("   ✅ [chat] iteration generated; new imageCallId=", callChat.id);
 
-      // d) Guardar + subir a S3
+      // 5) Guardar + subir a S3
       const buf2Chat   = Buffer.from(callChat.result, "base64");
       const fname2Chat = `${Date.now()}.png`;
       const local2Chat = join(OUTPUT_DIR, fname2Chat);
@@ -400,7 +420,7 @@ Return only the rewritten instruction.
       const key2Chat   = await uploadToS3(OUTPUT_CFG, local2Chat, fname2Chat);
       console.log("   ✅ [chat] iteration uploaded:", key2Chat);
 
-      // e) Obtener signed URL y responder
+      // 6) Obtener signed URL y responder
       const newUrl = await signedUrl(OUTPUT_CFG.bucket, key2Chat);
       return res.json({
         resultUrl:   newUrl,
@@ -453,8 +473,11 @@ Return only the rewritten instruction.
       temperature: 0.1,
       input: [
         // Recordatorio al modelo de estilo ING
-        { role: "system", content:
-            "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows." },
+        {
+          role: "system",
+          content:
+            "ING style: accent color #FF6200 sparingly, flat shapes, light-hearted humor, simple geometric forms without strokes, no shadows."
+        },
         { role: "user", content: [{ type: "input_text", text }] },
         { type: "image_generation_call", id: imageCallId }
       ],
