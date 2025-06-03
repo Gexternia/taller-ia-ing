@@ -169,8 +169,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
             type: "input_text",
             text:
               "Describe what you see in this image in up to 1000 characters " +
-              "as an interpretation —not focusing on materials or style— " +
-              "but including precise positions of all objects (e.g., 'The compass is centered, with a circular dial and a red needle pointing north; background white')."
+              "as an interpretation —not focusing on materials or style— of what the user wanted to represent " +
+              "but including positions of all objects (e.g., 'The lion is centered, facing right; behind it is a sunset on the left, trees on the right')."
           }
         ]
       }]
@@ -240,11 +240,11 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
       url:   refDataURLs[i]
     }));
 
-    // 9) Responder al cliente con todo, incluyendo la descripción
+    // 9) Responder al cliente con todo
     return res.json({
       resultUrl,
       brandRefs,
-      description,           // <--- enviamos la descripción original
+      description,              // <-- enviamos la descripción original aquí
       responseId:  gen.id,
       imageCallId: call.id
     });
@@ -271,11 +271,13 @@ app.post("/api/iterate", async (req, res) => {
       console.warn("❌ /api/iterate: missing previousResponseId or imageCallId");
       return res.status(400).json({ error: "Missing previousResponseId or imageCallId" });
     }
+
     console.log(
       "➡️ /api/iterate",
       action, actionParam,
       "prevResp:", previousResponseId,
-      "callId:", imageCallId
+      "callId:", imageCallId,
+      "origDesc:", originalDescription
     );
 
     // --------------- Validación de longitud en backend ---------------
@@ -285,39 +287,40 @@ app.post("/api/iterate", async (req, res) => {
         console.warn("❌ /api/iterate chat without actionParam");
         return res.status(400).json({ error: "chat requires a text parameter" });
       }
+      if (!originalDescription) {
+        console.warn("❌ /api/iterate chat without originalDescription");
+        return res.status(400).json({ error: "originalDescription is required for chat" });
+      }
       if (actionParam.length > CHAT_BACKEND_MAX) {
         return res.status(400).json({
           error: `Instrucción demasiado larga: máximo ${CHAT_BACKEND_MAX} caracteres.`
         });
-      }
-      if (!originalDescription) {
-        console.warn("❌ /api/iterate chat without originalDescription");
-        return res.status(400).json({ error: "Missing originalDescription for chat" });
       }
     }
     // ------------------------------------------------------------------
 
     // --- Caso “Modificar vía chat”: reescribir el texto con gpt-4.1-nano ---
     if (action === "chat") {
-      // 1) Truncar raw instrucción si pasa RAW_LIMIT
+      // 1) Reescribir la instrucción libre con gpt-4.1-nano
       const RAW_LIMIT = 300;
       const rawInstr = actionParam.length > RAW_LIMIT
         ? actionParam.slice(0, RAW_LIMIT) + "…"
         : actionParam;
 
-      // 2) Construir prompt de reescritura incluyendo originalDescription
+      // Ahora incluimos originalDescription para asegurarnos de que el “main object” permanece igual
       const rewritePrompt = `
-You are an AI “style police” for ING’s illustration prompts.
-Given:
-1) A brief description of the current illustration: "${originalDescription.replace(/"/g, '\\"')}"
-2) The user’s free-text instruction: "${rawInstr.replace(/"/g, '\\"')}"
-
-Rewrite the user’s instruction so that:
+You are an AI style police for ING’s illustration prompts.
+Given the user’s free-text instruction and the original description of the previous image, rewrite it so that:
 - Never leave ING’s style: light-hearted humor, simple geometric shapes without strokes, and subtle details. Add a touch of humor.
 - Do not mention shadows, complex edges, realistic textures, or any effect that contradicts the “flat, vector-based” guideline.
-- Conserve the MAIN OBJECT (as described above) and adjust only small details or disposition based on the user’s request.
+- Keep the same main object that appeared in the previous image: "${originalDescription}".
+- Only adjust small arrangements or add a slight “sci-fi” reference if requested, without changing the central object.
 
-Return only the clean rewritten instruction (no explanations, no extra commentary).
+Client’s raw instruction:
+"${rawInstr.replace(/"/g, '\\"')}"
+
+Rewrite that instruction to follow EXACTLY the above guidelines—and nothing else.
+Return only the clean text (no explanations).
       `;
 
       const rewriteResponse = await openai.responses.create({
@@ -336,7 +339,7 @@ Return only the clean rewritten instruction (no explanations, no extra commentar
       console.log("   ▶[chat] Original user text:", actionParam);
       console.log("   ▶[chat] Rewritten text:", rewrittenText);
 
-      // 3) Con el texto reescrito, hacer la llamada de edición de imagen
+      // 2) Con el texto reescrito, hacer la llamada de edición de imagen
       const itChat = await openai.responses.create({
         model: "gpt-4.1-mini",
         input: [
@@ -354,7 +357,7 @@ Return only the clean rewritten instruction (no explanations, no extra commentar
       if (!callChat?.result) throw new Error("No image returned from chat iteration");
       console.log("   ✅ [chat] iteration generated; new imageCallId=", callChat.id);
 
-      // 4) Guardar + subir a S3
+      // 3) Guardar + subir a S3
       const buf2Chat   = Buffer.from(callChat.result, "base64");
       const fname2Chat = `${Date.now()}.png`;
       const local2Chat = join(OUTPUT_DIR, fname2Chat);
@@ -362,7 +365,7 @@ Return only the clean rewritten instruction (no explanations, no extra commentar
       const key2Chat   = await uploadToS3(OUTPUT_CFG, local2Chat, fname2Chat);
       console.log("   ✅ [chat] iteration uploaded:", key2Chat);
 
-      // 5) Responder con nuevo signedUrl, responseId e imageCallId
+      // 4) Responder con nuevo signedUrl, responseId e imageCallId
       return res.json({
         resultUrl:   await signedUrl(OUTPUT_CFG.bucket, key2Chat),
         responseId:  itChat.id,
@@ -402,7 +405,7 @@ Return only the clean rewritten instruction (no explanations, no extra commentar
       add_title:      p => `Add the following title below the image: "${p}".`
     };
 
-    // 4) Para los demás casos (no “chat”), usar el mapeo o texto genérico
+    // 4) Para los demás casos (no “chat”), usar mapeo o texto genérico
     const text =
       action === "chat"
         ? actionParam
@@ -462,6 +465,7 @@ app.get("*", (_req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`⚡ API listening on port ${PORT}`));
+
 
 
 

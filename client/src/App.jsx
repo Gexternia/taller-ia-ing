@@ -77,6 +77,7 @@ export default function App() {
 
   // --- Iteraciones ----------------------------------------------------------
   async function iterate(action, param) {
+    console.log("Payload originalDescription:", originalDescription);
     if (!responseId || !imageCallId) {
       alert("Primero genera la imagen inicial");
       return;
