@@ -1,4 +1,34 @@
-body { font-family: system-ui, sans-serif; margin: 2rem; }
-button, input, textarea { padding: .6rem 1rem; margin-right: .5rem; }
-img { max-width: 400px; display: block; margin-top: 1rem; }
-.hidden { display:none; }
+/* === Declaración de la fuente INGdisplay-Bold === */
+@font-face {
+  font-family: 'INGdisplay-Bold';
+  /* Ruta relativa a public/fonts */
+  src: url('/fonts/INGdisplay-Bold.woff2') format('woff2'),
+       url('/fonts/INGdisplay-Bold.woff')  format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* ================================================ */
+
+/* Aplicamos la fuente a todo el body */
+body {
+  font-family: 'INGdisplay-Bold', system-ui, sans-serif;
+  margin: 2rem;
+}
+
+button,
+input,
+textarea {
+  padding: 0.6rem 1rem;
+  margin-right: 0.5rem;
+}
+
+img {
+  max-width: 400px;
+  display: block;
+  margin-top: 1rem;
+}
+
+.hidden {
+  display: none;
+}
