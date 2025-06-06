@@ -1,34 +1,193 @@
-/* === Declaración de la fuente INGdisplay-Bold === */
+/* client/src/styles.css */
+
+/* === 1) DECLARACIÓN DE LA FUENTE INGdisplay-Bold === */
 @font-face {
   font-family: 'INGdisplay-Bold';
-  /* Ruta relativa a public/fonts */
   src: url('/fonts/INGdisplay-Bold.woff2') format('woff2'),
-       url('/fonts/INGdisplay-Bold.woff')  format('woff');
+       url('/fonts/INGdisplay-Bold.woff') format('woff');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
-/* ================================================ */
+/* ================================================== */
 
-/* Aplicamos la fuente a todo el body */
+/* === 2) ESTILOS GLOBALES BÁSICOS ==================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: 'INGdisplay-Bold', system-ui, sans-serif;
-  margin: 2rem;
+  background-color: #ffffff;
+  color: #333333;
+  line-height: 1.5;
+}
+
+/* Opcional: clases utilitarias básicas (puedes extenderlas) */
+.hidden {
+  display: none;
 }
 
 button,
 input,
 textarea {
+  font-family: inherit;
+  font-size: 1rem;
   padding: 0.6rem 1rem;
-  margin-right: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
 }
 
 img {
-  max-width: 400px;
+  max-width: 100%;
+  height: auto;
   display: block;
-  margin-top: 1rem;
 }
 
-.hidden {
-  display: none;
+/* ================================================== */
+
+/* === 3) ESTILOS ESPECÍFICOS DE FRONT “ING STYLE” ==== */
+
+/* HEADER FIJO */
+.header {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background-color: #ffffff;
+  border-radius: 9999px; /* redondeado completo */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  gap: 2rem;
 }
+
+/* LOGO ING + ICONO LEÓN */
+.header .logo-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header .logo-container .logo-box {
+  width: 2rem;
+  height: 2rem;
+  background-color: #FF6200; /* naranja ING */
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header .logo-container .logo-box span {
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* NAVEGACIÓN */
+.header nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.header nav button {
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #555555;
+  transition: color 0.2s;
+}
+
+.header nav button.active,
+.header nav button:hover {
+  color: #FF6200;
+}
+
+.header .reiniciar-btn {
+  margin-left: auto;
+  font-size: 0.875rem;
+  color: #555555;
+}
+
+.header .reiniciar-btn:hover {
+  color: #333333;
+}
+
+/* PANTALLA DE BIENVENIDA: CONTENEDORES */
+.welcome-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Izquierda en naranja */
+.welcome-left {
+  flex: 1;
+  background-color: #FF6200; /* ING orange */
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem;
+}
+
+.welcome-left h1 {
+  font-size: 3rem;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+}
+
+.welcome-left p {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  margin-bottom: 2rem;
+}
+
+.welcome-left .btn-primary {
+  background-color: #ffffff;
+  color: #FF6200;
+  font-size: 1.125rem;
+  font-weight: 600;
+  padding: 1rem 2rem;
+  border-radius: 2rem 2rem 1rem 2rem; /* bordes curvos a mano */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.welcome-left .btn-primary:hover {
+  background-color: #ffe5d9; /* variante suave */
+  transform: scale(1.02);
+}
+
+/* Derecha con imagen */
+.welcome-right {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-right img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.9);
+}
+
+.welcome-right .overlay-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.2), transparent);
+}
+
+/* =================================================== */
+
+
