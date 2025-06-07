@@ -128,7 +128,13 @@ export default function App() {
     setIsCameraReady(false);
   }
 
-
+// ► vuelve a añadir esta función:
+function onFile(e) {
+  if (e.target.files?.[0]) {
+    setCaptured(e.target.files[0]);
+    stopCamera();
+  }
+}
 
   // ==== Iteraciones ====
   async function iterate(action, param) {
@@ -351,7 +357,14 @@ export default function App() {
         <div className="upload-section">
           <label className="upload-btn" htmlFor="file-upload" style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}>
             Upload Image
-            <input id="file-upload" type="file" accept="image/*" onChange={onFile} hidden disabled={isGenerating} />
+            <input 
+            id="file-upload" 
+            type="file" 
+            accept="image/*" 
+            onChange={onFile} 
+            hidden 
+            disabled={isGenerating}
+            />
           </label>
         </div>
 
