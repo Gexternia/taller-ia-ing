@@ -319,17 +319,11 @@ function onFile(e) {
       {/* DERECHA */}
       <div className="capture-right">
 
-<div className="camera-controls" style={{ marginTop: "1.5rem", marginBottom: "1.5rem", justifyContent: "flex-start" }}>
+<div className="camera-controls" style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>
   <button
     className="btn-primary"
     style={{ minWidth: "180px", fontSize: "1.1rem" }}
-    onClick={() => {
-      if (cameraMode === "idle") {
-        startCamera();
-      } else {
-        takeShot();
-      }
-    }}
+    onClick={() => cameraMode === "idle" ? startCamera() : takeShot()}
     disabled={
       isGenerating ||
       (cameraMode === "active" && !isCameraReady)
@@ -340,19 +334,28 @@ function onFile(e) {
 </div>
 
 
-
         {/* --- Preview de cámara --- */}
         {cameraMode === "active" && (
   <div className="video-preview">
     <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted
-      className="camera-preview"
-      onLoadedMetadata={() => setIsCameraReady(true)}
-      style={{ width: "100%", borderRadius: "0.75rem", marginBottom: "1rem" }}
-    />
+       ref={videoRef}
+       autoPlay
+       muted
+       playsInline
+       {...{ "webkit-playsinline": true }}
+       className="camera-preview"
+       onLoadedMetadata={() => {
+         console.log("Video listo");
+         setIsCameraReady(true);
+       }}
+       onError={e => console.error("Video error", e)}
+       style={{
+         width: "100%",
+         borderRadius: "0.75rem",
+         marginBottom: "1rem",
+         backgroundColor: "#000"
+       }}
+     />
     <canvas ref={canvasRef} className="hidden" />
   </div>
 )}
