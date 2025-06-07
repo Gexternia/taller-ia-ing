@@ -198,16 +198,62 @@ export default function App() {
 );
 /// --- CaptureScreen ---
 const CaptureScreen = () => (
-  <div className="capture-container">
+  <div
+    className="capture-container"
+    style={{ display: "flex", minHeight: "100vh" }}
+  >
     <Header />
-
-    {/* IZQUIERDA (tu contenido fijo) */}
-    <div
-      className="capture-left"
-      style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+    {/* IZQUIERDA: info + foto */}
+<div
+  className="capture-left"
+  style={{
+    flex: 1,
+    backgroundColor: "#FF6200",
+    color: "#FFFFFF",
+    padding: "2rem",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    borderTopLeftRadius: "1rem",
+    borderBottomLeftRadius: "1rem"
+  }}
+>
+  <div>
+    <h2 style={{ fontSize: "2rem", fontWeight: 700, lineHeight: 1.2, marginBottom: "1rem" }}>
+      Your strategy.<br/>
+      Your style.<br/>
+      Your illustration.
+    </h2>
+    <p style={{ fontSize: "1rem", marginBottom: "1.5rem", maxWidth: "20rem" }}>
+      Take a photo or upload your sketch to generate an ING-style illustration.
+    </p>
+    <button
+      className="btn-primary"
+      style={{
+        backgroundColor: "#FFFFFF",
+        color: "#FF6200",
+        padding: "0.75rem 1.5rem",
+        borderRadius: "9999px",
+        fontWeight: 600,
+        fontSize: "1rem",
+        cursor: "pointer"
+      }}
+      onClick={() => setCurrentScreen("capture")}
     >
-      {/* … tu contenido de la izquierda … */}
-    </div>
+      Get Started →
+    </button>
+  </div>
+  <img
+    src="/images/foto2.jpg"
+    alt="Inspire"
+    style={{
+      width: "100%",
+      borderRadius: "0.75rem",
+      marginTop: "2rem",
+      objectFit: "cover"
+    }}
+  />
+</div>
 
     {/* DERECHA: un único input que abre cámara o selector */}
     <div className="capture-right">
