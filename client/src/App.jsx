@@ -22,76 +22,78 @@ export default function App() {
   const [cameraMode, setCameraMode] = useState("idle"); // "idle" | "active"
   const [isCameraOn, setIsCameraOn] = useState(false);
 
-  // ==== Cámara ====
+// ==== Cámara ====
 
-async function startCamera() {
-  // Si hay un stream activo, ciérralo primero
-  if (videoRef.current?.srcObject) {
-    stopCamera();
+  async function startCamera() {
+    // Si ya había un stream activo, lo detenemos primero
+    if (videoRef.current?.srcObject) {
+      stopCamera();
+    }
+    try {
+      // Solo vídeo (sin audio), preferimos la trasera
+      const constraints = {
+        video: { facingMode: { ideal: "environment" } },
+        audio: false
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      const video = videoRef.current;
+      video.srcObject   = stream;
+      video.muted       = true;      // evitar pedir permiso de audio
+      video.playsInline = true;      // inline en iOS
+      await video.play();            // arranca el vídeo
+
+      setCameraMode("active");
+      setIsCameraOn(true);
+    } catch (e) {
+      console.error("getUserMedia error:", e);
+      if (e.name === "NotAllowedError") {
+        alert("Permiso denegado para acceder a la cámara. Actívalo en la configuración del navegador.");
+      } else if (e.name === "NotFoundError" || e.name === "OverconstrainedError") {
+        alert("No se encontró cámara disponible o está siendo usada por otra app.");
+      } else {
+        alert("No se pudo activar la cámara. Prueba cerrar otras apps o revisa permisos del navegador.");
+      }
+      setCameraMode("idle");
+      setIsCameraOn(false);
+    }
   }
 
-  try {
-    // Pedimos solo vídeo (sin audio), idealmente la trasera
-    const constraints = {
-      video: {
-        facingMode: { ideal: "environment" }
-      },
-      audio: false
-    };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+  function takeShot() {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
 
-    // Asignamos el stream al video y configuramos atributos
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      alert("La cámara no está lista todavía. Espera un momento.");
+      return;
+    }
+
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+    canvas.toBlob(blob => {
+      setCaptured(blob);
+      stopCamera();
+    }, "image/png");
+  }
+
+  function stopCamera() {
     const video = videoRef.current;
-    video.srcObject = stream;
-    video.muted = true;           // evita pedir permiso de audio
-    video.playsInline = true;     // necesario en iOS
-    await video.play();           // arranca el vídeo
-
-    setCameraMode("active");
-    setIsCameraOn(true);
-  } catch (e) {
-    console.error("getUserMedia error:", e);
-    // Mensajes de error más específicos
-    if (e.name === "NotAllowedError") {
-      alert("Permiso denegado para acceder a la cámara. Actívalo en la configuración del navegador.");
-    } else if (e.name === "NotFoundError" || e.name === "OverconstrainedError") {
-      alert("No se encontró cámara disponible o está siendo usada por otra app.");
-    } else {
-      alert("No se pudo activar la cámara. Prueba cerrar otras apps o revisa permisos del navegador.");
+    if (video?.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
     }
     setCameraMode("idle");
     setIsCameraOn(false);
   }
-}
 
-function takeShot() {
-  const video = videoRef.current;
-  const canvas = canvasRef.current;
-
-  if (!video || !video.videoWidth || !video.videoHeight) {
-    alert("La cámara no está lista todavía. Espera un momento.");
-    return;
+  function onFile(e) {
+    if (e.target.files[0]) {
+      setCaptured(e.target.files[0]);
+      stopCamera();
+    }
   }
-
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-
-  canvas.toBlob(blob => {
-    setCaptured(blob);
-    stopCamera();
-  }, "image/png");
-}
-
-function stopCamera() {
-  const video = videoRef.current;
-  if (video?.srcObject) {
-    video.srcObject.getTracks().forEach(track => track.stop());
-    video.srcObject = null;
-  }
-  setCameraMode("idle");
-  setIsCameraOn(false);
-}
 
   // ==== Iteraciones ====
   async function iterate(action, param) {
