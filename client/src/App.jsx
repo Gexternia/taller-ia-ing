@@ -200,74 +200,31 @@ export default function App() {
 const CaptureScreen = () => (
   <div
     className="capture-container"
-    style={{
-      display: "flex",
-      minHeight: "100vh",
-      paddingTop: 0,     // ya no hace falta compensar el header
-    }}
+    style={{ paddingTop: 0 /* ya no hace falta compensar el header */ }}
   >
     <Header />
 
-    {/* IZQUIERDA: texto arriba, foto abajo */}
-    <div
-      className="capture-left"
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        borderTopLeftRadius: "1rem",
-        borderBottomLeftRadius: "1rem",
-        overflow: "hidden",
-      }}
-    >
+    {/* IZQUIERDA: texto centrado + fondo parallax */}
+    <div className="capture-left">
       {/* Zona de texto */}
-      <div
-        style={{
-          backgroundColor: "#FF6200",
-          color: "#FFF",
-          padding: "3rem 2rem",
-          flex: "0 0 auto",
-        }}
-      >
-        <h2 style={{ fontSize: "2.5rem", lineHeight: 1.2, marginBottom: "1rem" }}>
+      <div className="info">
+        <h2>
           Take a photo.<br />
           Transform your strategy.
         </h2>
-        <p style={{ fontSize: "1.125rem" }}>
+        <p>
           Take a photo or upload your sketch to generate an ING-style illustration.
         </p>
       </div>
-
       {/* Zona de foto con parallax */}
-      <div
-        style={{
-          flex: 1,
-          backgroundImage: "url('/images/foto2.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundAttachment: "fixed",
-        }}
-      />
+      <div className="bg" />
     </div>
 
     {/* DERECHA: selector + preview + botón Generate */}
-    <div
-      className="capture-right"
-      style={{
-        flex: 1,
-        backgroundColor: "#FEF3EE",
-        padding: "4rem 3rem",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "flex-start",
-        borderTopRightRadius: "1rem",
-        borderBottomRightRadius: "1rem",
-      }}
-    >
+    <div className="capture-right">
       {/* Input cámara / upload */}
-      <div className="upload-section" style={{ marginBottom: "2rem" }}>
-        <label className="upload-btn" htmlFor="file-upload">
+      <div className="upload-section">
+        <label className="upload-btn btn-secondary" htmlFor="file-upload">
           {captured ? "Change Image" : "Take Photo / Upload"}
           <input
             id="file-upload"
@@ -283,11 +240,10 @@ const CaptureScreen = () => (
 
       {/* Preview */}
       {captured && (
-        <div className="preview-box" style={{ marginBottom: "2rem", width: "100%" }}>
+        <div className="preview-box">
           <img
             src={URL.createObjectURL(captured)}
             alt="Preview"
-            style={{ width: "100%", borderRadius: "0.75rem" }}
           />
         </div>
       )}
@@ -295,7 +251,6 @@ const CaptureScreen = () => (
       {/* Generate Illustration */}
       <button
         className="btn-primary"
-        style={{ width: "100%", maxWidth: "360px" }}
         onClick={generate}
         disabled={!captured || isGenerating}
       >
@@ -304,6 +259,7 @@ const CaptureScreen = () => (
     </div>
   </div>
 );
+
 
 
   // --- Generating (pantalla intermedia, sin cambios) ---
@@ -632,53 +588,59 @@ const CaptureScreen = () => (
           )}
 
           {/* Sub-menú Modify AI */}
-          {showChatBox && (
-            <div style={{
-              marginTop: "1rem",
-              background: "#F7F7F7",
-              borderRadius: "1rem",
-              padding: "1rem"
-            }}>
-              <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}>Modify with AI</p>
-              <textarea
-                rows={3}
-                maxLength={250}
-                placeholder="Describe the changes you want to apply…"
-                value={chatText}
-                onChange={e => setChatText(e.target.value)}
-                disabled={isGenerating}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #E5E7EB",
-                  resize: "none",
-                  fontFamily: "inherit",
-                  marginBottom: "0.5rem"
-                }}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "0.75rem", color: "#777777" }}>{chatText.length}/250 chars</span>
-                <button
-                  onClick={() => {
-                    iterate("chat", chatText);
-                    setShowChatBox(false);
-                    setChatText("");
-                  }}
-                  disabled={isGenerating || !chatText.trim()}
-                  style={{
-                    background: "#0284C7",
-                    color: "#ffffff",
-                    padding: "0.5rem 1rem",
-                    borderRadius: "0.5rem",
-                    cursor: (isGenerating || !chatText.trim()) ? "not-allowed" : "pointer",
-                    opacity: (isGenerating || !chatText.trim()) ? 0.5 : 1
-                  }}
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
+{showChatBox && (
+  <div style={{
+    marginTop: "1rem",
+    background: "#F7F7F7",
+    borderRadius: "1rem",
+    padding: "1rem"
+  }}>
+    <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}>
+      Modify with AI
+    </p>
+    <textarea
+      rows={3}
+      maxLength={250}
+      placeholder="Describe the changes you want to apply…"
+      value={chatText}
+      onChange={e => setChatText(e.target.value)}  {/* sólo actualiza chatText */}
+      disabled={isGenerating}
+      style={{
+        width: "100%",
+        padding: "0.75rem",
+        borderRadius: "0.5rem",
+        border: "1px solid #E5E7EB",
+        resize: "none",
+        fontFamily: "inherit",
+        marginBottom: "0.5rem"
+      }}
+    />
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ fontSize: "0.75rem", color: "#777777" }}>
+        {chatText.length}/250 chars
+      </span>
+      <button
+        onClick={() => {
+          iterate("chat", chatText);      // aquí sí lanzamos la iteración
+          setShowChatBox(false);
+          setChatText("");
+        }}
+        disabled={isGenerating || !chatText.trim()}
+        style={{
+          background: "#0284C7",
+          color: "#ffffff",
+          padding: "0.5rem 1rem",
+          borderRadius: "0.5rem",
+          cursor: (isGenerating || !chatText.trim()) ? "not-allowed" : "pointer",
+          opacity: (isGenerating || !chatText.trim()) ? 0.5 : 1
+        }}
+      >
+        Apply
+      </button>
+    </div>
+  </div>
+)}
+
           )}
         </div>
         {/* Botón Regenerar */}
