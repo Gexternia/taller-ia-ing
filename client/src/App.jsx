@@ -319,23 +319,27 @@ function onFile(e) {
       {/* DERECHA */}
       <div className="capture-right">
 
-        {/* --- Botón cámara corporativo ING --- */}
-        <div className="camera-controls" style={{ marginTop: "1.5rem", marginBottom: "1.5rem", justifyContent: "flex-start" }}>
-          <button
-            className="btn-primary"
-            style={{ minWidth: "180px", fontSize: "1.1rem" }}
-            onClick={() => {
- if (cameraMode === "idle") {
-     startCamera();
-   } else {
-     takeShot();
-   }
- }}
-            disabled={!isCameraReady || isGenerating}
-          >
-            {cameraMode === "idle" ? "Activate Camera" : "Capture"}
-          </button>
-        </div>
+<div className="camera-controls" style={{ marginTop: "1.5rem", marginBottom: "1.5rem", justifyContent: "flex-start" }}>
+  <button
+    className="btn-primary"
+    style={{ minWidth: "180px", fontSize: "1.1rem" }}
+    onClick={() => {
+      if (cameraMode === "idle") {
+        startCamera();
+      } else {
+        takeShot();
+      }
+    }}
+    disabled={
+      isGenerating ||
+      (cameraMode === "active" && !isCameraReady)
+    }
+  >
+    {cameraMode === "idle" ? "Activate Camera" : "Capture"}
+  </button>
+</div>
+
+
 
         {/* --- Preview de cámara --- */}
         {cameraMode === "active" && (
