@@ -102,31 +102,32 @@ export default function App() {
   }
 
   // ==== Cámara ====
-  function startCamera() {
+    function startCamera() {
     setCameraMode("active");
   }
-
   function takeShot() {
-    if (!isCameraReady) {
-      alert("La cámara aún no está lista.");
-      return;
-    }
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    canvas.toBlob((blob) => {
-      setCaptured(blob);
-      stopCamera();
-    }, "image/png");
+  if (!isCameraReady) {
+    alert("La cámara aún no está lista.");
+    return;
   }
+  const video  = videoRef.current;
+  const canvas = canvasRef.current;
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
 
-  function stopCamera() {
-    setCameraMode("idle");
-    setIsCameraOn(false);
-    setIsCameraReady(false);
-  }
+  canvas.toBlob((blob) => {
+    console.log("Blob capturado:", blob);
+    setCaptured(blob);
+    stopCamera();
+  }, "image/png");
+ }  // ← Aquí cierra takeShot
+
+function stopCamera() {
+  setCameraMode("idle");
+  setIsCameraOn(false);
+  setIsCameraReady(false);
+}
 
 // ► vuelve a añadir esta función:
 function onFile(e) {
@@ -135,6 +136,7 @@ function onFile(e) {
     stopCamera();
   }
 }
+
 
   // ==== Iteraciones ====
   async function iterate(action, param) {
@@ -258,28 +260,30 @@ function onFile(e) {
 
   // --- Home / Welcome ---
   const WelcomeScreen = () => (
-    <div className="welcome-container">
-      <Header />
-      <div className="welcome-left">
-        <h1>
-          Your strategy.<br />
-          Your style.<br />
-          Your illustration.
-        </h1>
-        <p>
-          Transform your ideas into professional illustrations with AI & ING style.
-        </p>
-        <button className="btn-primary" onClick={() => setCurrentScreen("capture")}>
-          Get Started →
-        </button>
-      </div>
-      <div className="welcome-right">
-        <img src="/images/nueva-portada.jpg" alt="Team working" />
-        <div className="overlay-gradient"></div>
-      </div>
+  <div className="welcome-container">
+    <Header />
+    <div className="welcome-left">
+      <h1>
+        Your strategy.<br />
+        Your style.<br />
+        Your illustration.
+      </h1>
+      <p>
+        Transform your ideas into professional illustrations with AI & ING style.
+      </p>
+      <button
+        className="btn-primary"
+        onClick={() => setCurrentScreen("capture")}
+      >
+        Get Started →
+      </button>
     </div>
-  );
-
+    <div className="welcome-right">
+      <img src="/images/nueva-portada.jpg" alt="Team working" />
+      <div className="overlay-gradient"></div>
+    </div>
+  </div>
+);
   // --- Capture ---
   const CaptureScreen = () => (
     <div className="capture-container">
@@ -342,21 +346,11 @@ function onFile(e) {
        autoPlay
        muted
        playsInline
-       {...{ "webkit-playsinline": true }}
        className="camera-preview"
-       onLoadedMetadata={() => {
-         console.log("Video listo");
-         setIsCameraReady(true);
-       }}
-       onError={e => console.error("Video error", e)}
-       style={{
-         width: "100%",
-         borderRadius: "0.75rem",
-         marginBottom: "1rem",
-         backgroundColor: "#000"
-       }}
-     />
-    <canvas ref={canvasRef} className="hidden" />
+       onLoadedMetadata={() => setIsCameraReady(true)}
+            />
+             <canvas ref={canvasRef} className="hidden" />
+       
   </div>
 )}
 
@@ -376,11 +370,11 @@ function onFile(e) {
         </div>
 
         {/* --- Preview de imagen subida/capturada --- */}
-        {captured && (
-          <div className="preview-box" style={{ marginBottom: "1.5rem" }}>
-            <img src={URL.createObjectURL(captured)} alt="Preview" />
-          </div>
-        )}
+       {captured && (
+  <div className="preview-box">
+    <img src={URL.createObjectURL(captured)} alt="Preview" />
+  </div>
+)}
 
         <button
           className="btn-primary"
