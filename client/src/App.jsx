@@ -23,81 +23,75 @@ export default function App() {
   const [isCameraOn, setIsCameraOn] = useState(false);
 
   // ==== Cámara ====
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      videoRef.current.srcObject = stream;
-      setCameraMode("active");
-      setIsCameraOn(true);
-    } catch (e) {
-      alert("No se pudo activar la cámara. Prueba cerrar otras apps o revisa permisos del navegador.");
-      setCameraMode("idle");
-      setIsCameraOn(false);
-    }
-  }
-  function takeShot() {
-    const canvas = canvasRef.current;
-    canvas.width  = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
-    canvas.toBlob(blob => {
-      setCaptured(blob);
-      stopCamera();
-    }, "image/png");
-  }
-  function stopCamera() {
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraOn(false);
-    setCameraMode("idle");
-  }
-  function onFile(e) {
-    setCaptured(e.target.files[0]);
+
+async function startCamera() {
+  // Si hay un stream activo, ciérralo primero
+  if (videoRef.current?.srcObject) {
     stopCamera();
   }
 
-  // ==== Generación ====
-  async function generate() {
-    if (!captured) {
-      alert("Sube o captura una imagen primero");
-      return;
+  try {
+    // Pedimos solo vídeo (sin audio), idealmente la trasera
+    const constraints = {
+      video: {
+        facingMode: { ideal: "environment" }
+      },
+      audio: false
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    // Asignamos el stream al video y configuramos atributos
+    const video = videoRef.current;
+    video.srcObject = stream;
+    video.muted = true;           // evita pedir permiso de audio
+    video.playsInline = true;     // necesario en iOS
+    await video.play();           // arranca el vídeo
+
+    setCameraMode("active");
+    setIsCameraOn(true);
+  } catch (e) {
+    console.error("getUserMedia error:", e);
+    // Mensajes de error más específicos
+    if (e.name === "NotAllowedError") {
+      alert("Permiso denegado para acceder a la cámara. Actívalo en la configuración del navegador.");
+    } else if (e.name === "NotFoundError" || e.name === "OverconstrainedError") {
+      alert("No se encontró cámara disponible o está siendo usada por otra app.");
+    } else {
+      alert("No se pudo activar la cámara. Prueba cerrar otras apps o revisa permisos del navegador.");
     }
-    setIsGenerating(true);
-    setCurrentScreen("generating");
-
-    setResultUrl(null);
-    setResponseId(null);
-    setImageCallId(null);
-    setBrandRefs([]);
-    setShowColorOptions(false);
-    setShowChatBox(false);
-    setShowTitleOptions(false);
-    setOriginalDescription("");
-    setPrevImageUrl("");
-
-    const form = new FormData();
-    form.append("image", captured, "input.png");
-    const res  = await fetch("/api/generate", { method: "POST", body: form });
-    const data = await res.json();
-
-    if (data.error) {
-      alert("Error al generar: " + data.error);
-      setIsGenerating(false);
-      setCurrentScreen("capture");
-      return;
-    }
-
-    setResultUrl(data.resultUrl);
-    setResponseId(data.responseId);
-    setImageCallId(data.imageCallId);
-    setBrandRefs(data.brandRefs || []);
-    setOriginalDescription(data.description || "");
-    setPrevImageUrl(data.resultUrl);
-    setIsGenerating(false);
-    setCurrentScreen("result");
+    setCameraMode("idle");
+    setIsCameraOn(false);
   }
+}
+
+function takeShot() {
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    alert("La cámara no está lista todavía. Espera un momento.");
+    return;
+  }
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+  canvas.toBlob(blob => {
+    setCaptured(blob);
+    stopCamera();
+  }, "image/png");
+}
+
+function stopCamera() {
+  const video = videoRef.current;
+  if (video?.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
+    video.srcObject = null;
+  }
+  setCameraMode("idle");
+  setIsCameraOn(false);
+}
 
   // ==== Iteraciones ====
   async function iterate(action, param) {
@@ -330,16 +324,18 @@ export default function App() {
 
         {/* --- Preview de cámara --- */}
         {cameraMode === "active" && (
-          <div className="video-preview">
-            <video
-              ref={videoRef}
-              autoPlay
-              className="camera-preview"
-              style={{ width: "100%", borderRadius: "0.75rem", marginBottom: "1rem" }}
-            />
-            <canvas ref={canvasRef} className="hidden" />
-          </div>
-        )}
+  <div className="video-preview">
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted
+      className="camera-preview"
+      style={{ width: "100%", borderRadius: "0.75rem", marginBottom: "1rem" }}
+    />
+    <canvas ref={canvasRef} className="hidden" />
+  </div>
+)}
 
         {/* --- Upload section --- */}
         <div className="upload-section">
