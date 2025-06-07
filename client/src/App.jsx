@@ -284,57 +284,26 @@ function onFile(e) {
     </div>
   </div>
 );
-  const CaptureScreen = () => (
+// --- CaptureScreen ---
+const CaptureScreen = () => (
   <div className="capture-container">
     <Header />
 
     {/* IZQUIERDA */}
     <div
       className="capture-left"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between"
-      }}
+      style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}
     >
-      <div>
-        <h1 style={{ fontSize: "2.5rem", margin: "2rem 0 1rem" }}>
-          Capture Your<br />Strategy
-        </h1>
-        <p style={{ fontSize: "1.18rem", fontWeight: 500 }}>
-          Take a photo or upload your sketch.<br />
-          <span style={{ fontSize: "1rem", color: "#ffd6c2", fontWeight: 400 }}>
-            You will get an ING-style illustration!
-          </span>
-        </p>
-      </div>
-      <div style={{ margin: "2rem 0 1.5rem" }}>
-        <img
-          src="/images/foto2.jpg"
-          alt="Ejemplo ING"
-          style={{
-            width: "95%",
-            maxWidth: "320px",
-            borderRadius: "1.2rem",
-            boxShadow: "0 2px 16px rgba(60,0,0,0.08)",
-            border: "3px solid #fff6",
-            margin: "0 auto",
-            display: "block"
-          }}
-        />
-      </div>
+      {/* … tu contenido de la izquierda … */}
     </div>
 
     {/* DERECHA */}
     <div className="capture-right">
-      {/* Controles de cámara */}
       <div className="camera-controls" style={{ margin: "1.5rem 0" }}>
         <button
           className="btn-primary"
           style={{ minWidth: "180px", fontSize: "1.1rem" }}
-          onClick={() =>
-            cameraMode === "idle" ? startCamera() : takeShot()
-          }
+          onClick={() => (cameraMode === "idle" ? startCamera() : takeShot())}
           disabled={isGenerating || (cameraMode === "active" && !isCameraReady)}
         >
           {cameraMode === "idle" ? "Activate Camera" : "Capture"}
@@ -355,16 +324,25 @@ function onFile(e) {
               width: "100%",
               borderRadius: "0.75rem",
               marginBottom: "1rem",
-              backgroundColor: "#000"
+              backgroundColor: "#000",
             }}
           />
         </div>
       )}
 
-      {/* Canvas oculto para captura */}
-      <canvas ref={canvasRef} style={{ display: "none" }} />
+      {/* Canal off-screen para capturar el frame */}
+      <canvas
+        ref={canvasRef}
+        // aquí lo escondemos sin quitarlo del flujo de renderizado
+        style={{
+          position: "absolute",
+          top: "-9999px",
+          left: "-9999px",
+          visibility: "hidden",
+        }}
+      />
 
-      {/* Sección de subida */}
+      {/* Upload section */}
       <div className="upload-section">
         <label
           className="upload-btn"
@@ -383,21 +361,20 @@ function onFile(e) {
         </label>
       </div>
 
-      {/* Preview de la imagen capturada/subida */}
+      {/* Preview de la imagen capturada o subida */}
       {captured && (
         <div className="preview-box">
           <img src={URL.createObjectURL(captured)} alt="Preview" />
         </div>
       )}
 
-      {/* Botón de generar ilustración */}
       <button
         className="btn-primary"
         style={{ width: "100%", fontSize: "1.11rem", marginTop: "1rem" }}
         onClick={generate}
         disabled={!captured || isGenerating}
       >
-        {isGenerating ? "Generating..." : "Generate Illustration"}
+        {isGenerating ? "Generating…" : "Generate Illustration"}
       </button>
     </div>
   </div>
