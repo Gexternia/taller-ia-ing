@@ -52,6 +52,7 @@ img {
   align-items: center;
   padding: 0.75rem 1.5rem;
   gap: 2rem;
+  min-width: 350px;
 }
 .header .logo-container {
   display: flex;
@@ -59,32 +60,56 @@ img {
   gap: 0.5rem;
 }
 .header .logo-container img {
-  height: 1.5rem;
+  height: 1.7rem;
+  margin-right: 0.2rem;
 }
 .header nav {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.2rem;
+  align-items: center;
 }
 .header nav button,
-.header nav a {
+.header nav a,
+.header nav .nav-link {
   background: none;
-  font-size: 0.875rem;
+  border: none;
+  font-size: 0.95rem;
   font-weight: 500;
   color: #555555;
-  transition: color 0.2s;
+  padding: 0.2rem 0.3rem;
+  transition: color 0.2s, background 0.2s;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  min-width: 70px;
+  text-align: center;
+  outline: none;
 }
 .header nav button.active,
 .header nav button:hover,
-.header nav a:hover {
+.header nav a:hover,
+.header nav .nav-link:hover {
   color: #FF6200;
+  background: #fff4eb;
+}
+.header nav .nav-link {
+  margin-left: 0.1rem;
+  margin-right: 0.1rem;
 }
 .header .reiniciar-btn {
-  margin-left: auto;
-  font-size: 0.875rem;
-  color: #555555;
+  margin-left: 2rem;
+  font-size: 0.9rem;
+  color: #FF6200;
+  background: #fff4eb;
+  border-radius: 9999px;
+  padding: 0.55rem 1.2rem;
+  font-weight: 600;
+  transition: color 0.15s, background 0.2s;
+  border: 1px solid #FFB88A;
 }
 .header .reiniciar-btn:hover {
-  color: #333333;
+  color: #ffffff;
+  background: #FF6200;
+  border: 1px solid #FF6200;
 }
 
 /* === 4) SPINNER Y PULSACIÓN === */
@@ -132,10 +157,12 @@ img {
   padding: 1rem 2rem;
   border-radius: 2rem 2rem 1rem 2rem;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  transition: background-color 0.2s, transform 0.2s;
+  transition: background-color 0.2s, transform 0.2s, color 0.2s;
+  border: none;
 }
 .btn-primary:hover {
   background-color: #ffe5d9;
+  color: #c24e00;
   transform: scale(1.02);
 }
 .welcome-right {
@@ -173,24 +200,74 @@ img {
   flex: 1;
   background-color: #FFF0EB;
   padding: 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.5rem;
+  position: relative;
 }
 .camera-controls {
+  margin-bottom: 0.8rem;
   display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  justify-content: flex-start;
 }
 .camera-controls button {
   flex: 1;
+  min-width: 170px;
 }
+.upload-section {
+  margin-bottom: 0.7rem;
+}
+.upload-btn {
+  background: #eee;
+  border: 2px dashed #ccc;
+  padding: 1rem 0.5rem;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  border-radius: 1rem;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 0.8rem;
+  font-weight: 600;
+  color: #333;
+  font-size: 1.07rem;
+}
+.upload-btn:hover {
+  border-color: #FF6200;
+  background: #ffe5d9;
+}
+
+.video-preview {
+  margin-bottom: 1rem;
+}
+.camera-preview {
+  width: 100%;
+  border-radius: 1rem;
+  background: #222;
+  min-height: 200px;
+}
+
+/* Previsualización de imagen subida o capturada */
 .preview-box {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.17);
   border-radius: 1rem;
   padding: 1rem;
+  margin-bottom: 1rem;
+  min-height: 50px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .preview-box img {
   background: #fff;
   border-radius: 0.5rem;
   padding: 0.5rem;
+  max-height: 220px;
+  max-width: 320px;
+  margin: 0 auto;
+  display: block;
+  box-shadow: 0 2px 8px rgba(80,40,0,0.07);
 }
 
 /* === 7) GENERATING SCREEN === */
@@ -232,6 +309,7 @@ img {
   overflow: hidden;
   max-width: 800px;
   width: 100%;
+  position: relative;
 }
 .result-box img {
   width: 100%;

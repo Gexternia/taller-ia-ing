@@ -5,45 +5,64 @@ export default function App() {
   const videoRef   = useRef(null);
   const canvasRef  = useRef(null);
 
-  const [isCameraOn, setIsCameraOn]       = useState(false);
-  const [captured, setCaptured]           = useState(null);
-  const [resultUrl, setResultUrl]         = useState(null);
-  const [responseId, setResponseId]       = useState(null);
-  const [imageCallId, setImageCallId]     = useState(null);
-  const [brandRefs, setBrandRefs]         = useState([]);
-  const [isGenerating, setIsGenerating]   = useState(false);
+  const [isCameraOn, setIsCameraOn]         = useState(false);
+  const [captured, setCaptured]             = useState(null);
+  const [resultUrl, setResultUrl]           = useState(null);
+  const [responseId, setResponseId]         = useState(null);
+  const [imageCallId, setImageCallId]       = useState(null);
+  const [brandRefs, setBrandRefs]           = useState([]);
+  const [isGenerating, setIsGenerating]     = useState(false);
   const [originalDescription, setOriginalDescription] = useState("");
-  const [prevImageUrl, setPrevImageUrl]               = useState("");
+  const [prevImageUrl, setPrevImageUrl]     = useState("");
   const [showColorOptions, setShowColorOptions]   = useState(false);
-  const [showChatBox, setShowChatBox]             = useState(false);
+  const [showChatBox, setShowChatBox]       = useState(false);
   const [showTitleOptions, setShowTitleOptions]   = useState(false);
-  const [chatText, setChatText]                   = useState("");
-  const [currentScreen, setCurrentScreen]         = useState("welcome");
+  const [chatText, setChatText]             = useState("");
+  const [currentScreen, setCurrentScreen]   = useState("welcome");
+  const [cameraMode, setCameraMode]         = useState("idle"); // "idle" | "active"
 
-  /* Cámara */
+  /* --- Cámara --- */
   async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    videoRef.current.srcObject = stream;
-    setIsCameraOn(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      videoRef.current.srcObject = stream;
+      setIsCameraOn(true);
+      setCameraMode("active");
+    } catch (e) {
+      alert("Could not activate the camera.");
+    }
   }
   function takeShot() {
     const canvas = canvasRef.current;
     canvas.width  = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
-    canvas.toBlob(blob => setCaptured(blob), "image/png");
+    canvas.toBlob(blob => {
+      setCaptured(blob);
+      stopCamera();
+      setCameraMode("idle");
+      setIsCameraOn(false);
+    }, "image/png");
+  }
+  function stopCamera() {
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOn(false);
+    setCameraMode("idle");
   }
   function onFile(e) {
     setCaptured(e.target.files[0]);
+    stopCamera();
   }
 
-  /* Generación */
+  /* --- Generación --- */
   async function generate() {
     if (!captured) { alert("Upload or capture an image first"); return; }
     setIsGenerating(true);
     setCurrentScreen("generating");
     setResultUrl(null);
-    /* limpia estados de iteración */
     setResponseId(null); setImageCallId(null);
     setBrandRefs([]); setShowColorOptions(false);
     setShowChatBox(false); setShowTitleOptions(false);
@@ -60,7 +79,6 @@ export default function App() {
       setCurrentScreen("capture");
       return;
     }
-
     setResultUrl(data.resultUrl);
     setResponseId(data.responseId);
     setImageCallId(data.imageCallId);
@@ -71,14 +89,13 @@ export default function App() {
     setCurrentScreen("result");
   }
 
-  /* Iteraciones (incluye titulo, chat, paleta, etc.) */
+  /* --- Iteraciones (incluye titulo, chat, paleta, etc.) --- */
   async function iterate(action, param) {
     if (!responseId || !imageCallId) {
       alert("First generate the initial image"); return;
     }
     setIsGenerating(true);
 
-    /* caso suggest_title */
     if (action === "suggest_title") {
       const res = await fetch("/api/iterate", {
         method: "POST",
@@ -97,7 +114,6 @@ export default function App() {
       return;
     }
 
-    /* payload normal */
     const payload = {
       previousResponseId: responseId,
       imageCallId, action,
@@ -141,10 +157,7 @@ export default function App() {
     setShowTitleOptions(false);
     setChatText("");
     setCurrentScreen("welcome");
-    setIsCameraOn(false);
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(t=>t.stop());
-    }
+    stopCamera();
   }
 
   /* Spinner component */
@@ -152,7 +165,7 @@ export default function App() {
 
   /* HEADER común */
   const Header = () => (
-    <div className="header">
+    <header className="header">
       <div className="logo-container">
         <img src="/images/logo.png" alt="ING Logo" />
       </div>
@@ -171,12 +184,13 @@ export default function App() {
           className={currentScreen==="result"?"active":""}>
           Iteration
         </button>
-        <a href="https://form.typeform.com/to/Al1mzBDY" target="_blank" rel="noreferrer">
-          Voting
-        </a>
+        <button
+          className="nav-link"
+          onClick={()=> window.open("https://form.typeform.com/to/Al1mzBDY","_blank")}
+        >Voting</button>
       </nav>
       <button className="reiniciar-btn" onClick={resetApp}>Reset</button>
-    </div>
+    </header>
   );
 
   /* PANTALLAS */
@@ -205,18 +219,56 @@ export default function App() {
         <p>Take a photo or upload your sketch.</p>
       </div>
       <div className="capture-right">
+
+        {/* --- Único botón para cámara --- */}
         <div className="camera-controls">
-          <button className="btn-primary" onClick={startCamera} disabled={isGenerating}>
-            Activate Camera
-          </button>
-          <button className="btn-primary" onClick={takeShot}
-                  disabled={!isCameraOn || isGenerating}>
-            Capture
+          <button
+            className="btn-primary"
+            onClick={() => {
+              if (cameraMode === "idle") startCamera();
+              else takeShot();
+            }}
+            disabled={isGenerating}
+          >
+            {cameraMode === "idle" ? "Activate Camera" : "Capture"}
           </button>
         </div>
+
+        {/* --- Preview de cámara si activa --- */}
+        {cameraMode === "active" &&
+          <div className="video-preview">
+            <video
+              ref={videoRef}
+              autoPlay
+              className="camera-preview"
+              style={{ width: '100%', borderRadius: '0.75rem', marginBottom: '1rem' }}
+            />
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+        }
+
+        {/* --- Upload section --- */}
+        <div className="upload-section">
+          <label className="upload-btn" htmlFor="file-upload">
+            Upload Image
+            <input id="file-upload" type="file" accept="image/*" onChange={onFile} hidden disabled={isGenerating}/>
+          </label>
+        </div>
+
+        {/* --- Preview de imagen subida o capturada --- */}
         <div className="preview-box">
-          {captured && <img src={URL.createObjectURL(captured)} alt="Preview" />}
+          {captured &&
+            <img src={URL.createObjectURL(captured)} alt="Preview" />
+          }
         </div>
+
+        <button
+          className="btn-primary"
+          onClick={generate}
+          disabled={!captured || isGenerating}
+        >
+          Generate Illustration
+        </button>
       </div>
     </div>
   );
@@ -253,7 +305,6 @@ export default function App() {
     </div>
   );
 
-  /* SWITCH */
   if (currentScreen === "welcome")   return <WelcomeScreen/>;
   if (currentScreen === "capture")   return <CaptureScreen/>;
   if (currentScreen === "generating")return <GeneratingScreen/>;
