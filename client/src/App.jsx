@@ -21,36 +21,55 @@ export default function App() {
   const [currentScreen, setCurrentScreen]             = useState("welcome");
   const [cameraMode, setCameraMode]                   = useState("idle"); // "idle" | "active"
   const [isCameraOn, setIsCameraOn]                   = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
-    // ─── Arranque y parada automática de la cámara ───
+
+ // ─── Arranque y parada automática de la cámara ───
   useEffect(() => {
-    // Si no estamos en modo 'active', nada que hacer
     if (cameraMode !== "active") return;
 
-    // Intentamos arrancar la cámara
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" }, audio: false })
-      .then(stream => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.muted      = true;
-          videoRef.current.playsInline= true;
-          return videoRef.current.play();
-        }
+      .getUserMedia({ video: true, audio: false })
+      .then((stream) => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // asigna el stream UNA sola vez
+        video.srcObject    = stream;
+        video.muted        = true;
+        video.playsInline  = true;
+
+        // inicialmente la cámara NO está lista para capturar
+        setIsCameraReady(false);
+
+        // arrancamos el vídeo
+        return video.play();
       })
       .then(() => {
+        // aquí ya está reproduciendo
         setIsCameraOn(true);
       })
-      .catch(e => {
+      .catch((e) => {
         console.error("getUserMedia error:", e);
         const msg =
-          e.name === "NotAllowedError"  ? "Permiso denegado para la cámara."    :
-          e.name === "NotFoundError"    ? "No se encontró cámara disponible." :
-                                          "No se pudo activar la cámara.";
+          e.name === "NotAllowedError" ? "Permiso denegado para la cámara." :
+          e.name === "NotFoundError"   ? "No se encontró cámara disponible." :
+                                         "No se pudo activar la cámara.";
         alert(msg);
         setCameraMode("idle");
         setIsCameraOn(false);
       });
+
+    return () => {
+      const video = videoRef.current;
+      if (video?.srcObject) {
+        video.srcObject.getTracks().forEach((t) => t.stop());
+        video.srcObject = null;
+      }
+      setIsCameraOn(false);
+      setIsCameraReady(false);
+    };
+  }, [cameraMode]);
 
     // Cleanup: cuando salimos de 'active', detenemos el stream
     return () => {
@@ -111,21 +130,23 @@ export default function App() {
   function startCamera() {
     setCameraMode("active");
   }
-  function takeShot() {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !video.videoWidth) {
-      alert("La cámara no está lista.");
-      return;
-    }
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    canvas.toBlob(blob => {
-      setCaptured(blob);
-      stopCamera();
-    }, "image/png");
+ function takeShot() {
+  if (!isCameraReady) {
+    alert("La cámara aún no está lista.");
+    return;
   }
+  const video  = videoRef.current;
+  const canvas = canvasRef.current;
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  canvas.toBlob((blob) => {
+    setCaptured(blob);
+    stopCamera();
+  }, "image/png");
+}
 
   function stopCamera() {
     const video = videoRef.current;
@@ -135,6 +156,7 @@ export default function App() {
     }
     setCameraMode("idle");
     setIsCameraOn(false);
+    setIsCameraReady(false);
   }
 
   function onFile(e) {
@@ -339,7 +361,7 @@ export default function App() {
      takeShot();
    }
  }}
-            disabled={isGenerating}
+            disabled={!isCameraReady || isGenerating}
           >
             {cameraMode === "idle" ? "Activate Camera" : "Capture"}
           </button>
@@ -354,6 +376,7 @@ export default function App() {
       playsInline
       muted
       className="camera-preview"
+      onLoadedMetadata={() => setIsCameraReady(true)}
       style={{ width: "100%", borderRadius: "0.75rem", marginBottom: "1rem" }}
     />
     <canvas ref={canvasRef} className="hidden" />
