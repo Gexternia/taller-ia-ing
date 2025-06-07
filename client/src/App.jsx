@@ -124,7 +124,6 @@ export default function App() {
     setShowTitleOptions(false);
     setChatText("");
     setCurrentScreen("welcome");
-    stopCamera();
   }
   // =========================== RENDER PANTALLAS ===========================
 
@@ -197,104 +196,40 @@ export default function App() {
     </div>
   </div>
 );
-// --- CaptureScreen ---
+/// --- CaptureScreen ---
 const CaptureScreen = () => (
   <div className="capture-container">
     <Header />
 
-   {/* IZQUIERDA (tu contenido fijo) */}
-      <div className="capture-left" style={{ /* ... */ }}>
-        {/* … tu contenido de la izquierda … */}
-      </div>
-
-      {/* DERECHA: un único input que abre cámara o selector */}
-      <div className="capture-right">
-        <div className="upload-section">
-          <label
-            className="upload-btn"
-            htmlFor="file-upload"
-            style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}
-          >
-            {captured ? "Change Image" : "Take Photo / Upload"}
-            <input
-              id="file-upload"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={e => setCaptured(e.target.files[0])}
-              hidden
-              disabled={isGenerating}
-            />
-          </label>
-        </div>
-
-        {captured && (
-          <div className="preview-box">
-            <img src={URL.createObjectURL(captured)} alt="Preview" />
-          </div>
-        )}
-
-        <button
-          className="btn-primary"
-          style={{ width: "100%", fontSize: "1.11rem", marginTop: "1rem" }}
-          onClick={generate}
-          disabled={!captured || isGenerating}
-        >
-          {isGenerating ? "Generating…" : "Generate Illustration"}
-        </button>
-      </div>
-  {/* Preview de la imagen capturada o subida */}
-  {captured && (
-    <div className="preview-box">
-      <img src={URL.createObjectURL(captured)} alt="Preview" />
+    {/* IZQUIERDA (tu contenido fijo) */}
+    <div
+      className="capture-left"
+      style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}
+    >
+      {/* … tu contenido de la izquierda … */}
     </div>
-  )}
 
-  {/* Botón para enviar al backend */}
-  <button
-    className="btn-primary"
-    style={{ width: "100%", fontSize: "1.11rem", marginTop: "1rem" }}
-    onClick={generate}
-    disabled={!captured || isGenerating}
-  >
-    {isGenerating ? "Generating…" : "Generate Illustration"}
-  </button>
- </div>
-
-      )}
-
-      {/* Canal off-screen para capturar el frame */}
-      <canvas
-        ref={canvasRef}
-        // aquí lo escondemos sin quitarlo del flujo de renderizado
-        style={{
-          position: "absolute",
-          top: "-9999px",
-          left: "-9999px",
-          visibility: "hidden",
-        }}
-      />
-
-      {/* Upload section */}
+    {/* DERECHA: un único input que abre cámara o selector */}
+    <div className="capture-right">
       <div className="upload-section">
         <label
           className="upload-btn"
           htmlFor="file-upload"
           style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}
         >
-          Upload Image
+          {captured ? "Change Image" : "Take Photo / Upload"}
           <input
             id="file-upload"
             type="file"
             accept="image/*"
-            onChange={onFile}
+            capture="environment"
+            onChange={e => setCaptured(e.target.files[0])}
             hidden
             disabled={isGenerating}
           />
         </label>
       </div>
 
-      {/* Preview de la imagen capturada o subida */}
       {captured && (
         <div className="preview-box">
           <img src={URL.createObjectURL(captured)} alt="Preview" />
@@ -312,7 +247,6 @@ const CaptureScreen = () => (
     </div>
   </div>
 );
-
   // --- Generating (pantalla intermedia, sin cambios) ---
   const GeneratingScreen = () => (
     <div className="generating-container">
