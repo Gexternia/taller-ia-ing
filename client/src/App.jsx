@@ -196,7 +196,6 @@ export default function App() {
     </div>
   </div>
 );
-/// --- CaptureScreen ---
 // --- CaptureScreen ---
 const CaptureScreen = () => (
   <div
@@ -232,9 +231,9 @@ const CaptureScreen = () => (
             marginBottom: "1rem",
           }}
         >
-          Your strategy.<br />
-          Your style.<br />
-          Your illustration.
+          Take a photo.<br />
+          Transform<br />
+          your strategy.
         </h2>
         <p style={{ fontSize: "1rem", marginBottom: "1.5rem", maxWidth: "20rem" }}>
           Take a photo or upload your sketch to generate an ING-style illustration.
@@ -259,7 +258,7 @@ const CaptureScreen = () => (
         src="/images/foto2.jpg"
         alt="Inspirational"
         style={{
-          width: "100%",
+          width: "1000%",
           borderRadius: "0.75rem",
           marginTop: "2rem",
           objectFit: "cover",
