@@ -21,32 +21,28 @@ export default function App() {
   const [currentScreen, setCurrentScreen]             = useState("welcome");
   const [cameraMode, setCameraMode]                   = useState("idle"); // "idle" | "active"
   const [isCameraOn, setIsCameraOn]                   = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCameraReady, setIsCameraReady]             = useState(false);
 
-
- // ─── Arranque y parada automática de la cámara ───
+  // ─── Arranque y parada automática de la cámara ───
   useEffect(() => {
     if (cameraMode !== "active") return;
 
+    let streamRef;
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: false })
       .then((stream) => {
+        streamRef = stream;
         const video = videoRef.current;
         if (!video) return;
 
-        // asigna el stream UNA sola vez
-        video.srcObject    = stream;
-        video.muted        = true;
-        video.playsInline  = true;
-
-        // inicialmente la cámara NO está lista para capturar
+        video.srcObject   = stream;
+        video.muted       = true;
+        video.playsInline = true;
         setIsCameraReady(false);
 
-        // arrancamos el vídeo
         return video.play();
       })
       .then(() => {
-        // aquí ya está reproduciendo
         setIsCameraOn(true);
       })
       .catch((e) => {
@@ -57,13 +53,15 @@ export default function App() {
                                          "No se pudo activar la cámara.";
         alert(msg);
         setCameraMode("idle");
-        setIsCameraOn(false);
       });
 
     return () => {
+      // limpia tracks
+      if (streamRef) {
+        streamRef.getTracks().forEach((t) => t.stop());
+      }
       const video = videoRef.current;
-      if (video?.srcObject) {
-        video.srcObject.getTracks().forEach((t) => t.stop());
+      if (video) {
         video.srcObject = null;
       }
       setIsCameraOn(false);
@@ -71,55 +69,32 @@ export default function App() {
     };
   }, [cameraMode]);
 
-    // Cleanup: cuando salimos de 'active', detenemos el stream
-    return () => {
-      const vid = videoRef.current;
-      if (vid?.srcObject) {
-        vid.srcObject.getTracks().forEach(t => t.stop());
-        vid.srcObject = null;
-      }
-      setIsCameraOn(false);
-    };
-  }, [cameraMode]);
-
   // ==== generate(): envía la imagen a /api/generate y actualiza estados ====
   async function generate() {
     if (!captured) return;
-
     setIsGenerating(true);
     setCurrentScreen("generating");
-
-    // Preparamos FormData con el archivo
     const form = new FormData();
     form.append("image", captured);
 
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        body: form
-      });
+      const res = await fetch("/api/generate", { method: "POST", body: form });
       const data = await res.json();
-
       if (data.error) {
         alert("Error generando ilustración: " + data.error);
-        setIsGenerating(false);
         setCurrentScreen("capture");
         return;
       }
-
-      // Actualizamos todos los estados con la respuesta del backend
       setResultUrl(data.resultUrl);
       setBrandRefs(data.brandRefs || []);
       setResponseId(data.responseId);
       setImageCallId(data.imageCallId);
       setOriginalDescription(data.description || "");
       setPrevImageUrl(data.resultUrl);
-
-      // Pasamos a pantalla de resultado
       setCurrentScreen("result");
     } catch (err) {
       console.error("generate error:", err);
-      alert("Ha ocurrido un error de red al generar la imagen.");
+      alert("Error de red al generar la imagen.");
       setCurrentScreen("capture");
     } finally {
       setIsGenerating(false);
@@ -130,41 +105,30 @@ export default function App() {
   function startCamera() {
     setCameraMode("active");
   }
- function takeShot() {
-  if (!isCameraReady) {
-    alert("La cámara aún no está lista.");
-    return;
+
+  function takeShot() {
+    if (!isCameraReady) {
+      alert("La cámara aún no está lista.");
+      return;
+    }
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      setCaptured(blob);
+      stopCamera();
+    }, "image/png");
   }
-  const video  = videoRef.current;
-  const canvas = canvasRef.current;
-
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-
-  canvas.toBlob((blob) => {
-    setCaptured(blob);
-    stopCamera();
-  }, "image/png");
-}
 
   function stopCamera() {
-    const video = videoRef.current;
-    if (video?.srcObject) {
-      video.srcObject.getTracks().forEach(t => t.stop());
-      video.srcObject = null;
-    }
     setCameraMode("idle");
     setIsCameraOn(false);
     setIsCameraReady(false);
   }
 
-  function onFile(e) {
-    if (e.target.files[0]) {
-      setCaptured(e.target.files[0]);
-      stopCamera();
-    }
-  }
+
 
   // ==== Iteraciones ====
   async function iterate(action, param) {
