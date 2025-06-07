@@ -202,36 +202,47 @@ const CaptureScreen = () => (
   <div className="capture-container">
     <Header />
 
-    {/* IZQUIERDA */}
-    <div
-      className="capture-left"
-      style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}
-    >
-      {/* … tu contenido de la izquierda … */}
-    </div>
+   {/* IZQUIERDA (tu contenido fijo) */}
+      <div className="capture-left" style={{ /* ... */ }}>
+        {/* … tu contenido de la izquierda … */}
+      </div>
 
-    {/* DERECHA */}
- <div className="capture-right">
-  {/* Input que abre la cámara en móvil o el selector de archivos en desktop */}
-  <div className="upload-section">
-    <label
-      className="upload-btn"
-      htmlFor="file-upload"
-      style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}
-    >
-      {captured ? "Change Image" : "Take Photo / Upload"}
-      <input
-        id="file-upload"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={onFile}
-        hidden
-        disabled={isGenerating}
-      />
-    </label>
-  </div>
+      {/* DERECHA: un único input que abre cámara o selector */}
+      <div className="capture-right">
+        <div className="upload-section">
+          <label
+            className="upload-btn"
+            htmlFor="file-upload"
+            style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}
+          >
+            {captured ? "Change Image" : "Take Photo / Upload"}
+            <input
+              id="file-upload"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={e => setCaptured(e.target.files[0])}
+              hidden
+              disabled={isGenerating}
+            />
+          </label>
+        </div>
 
+        {captured && (
+          <div className="preview-box">
+            <img src={URL.createObjectURL(captured)} alt="Preview" />
+          </div>
+        )}
+
+        <button
+          className="btn-primary"
+          style={{ width: "100%", fontSize: "1.11rem", marginTop: "1rem" }}
+          onClick={generate}
+          disabled={!captured || isGenerating}
+        >
+          {isGenerating ? "Generating…" : "Generate Illustration"}
+        </button>
+      </div>
   {/* Preview de la imagen capturada o subida */}
   {captured && (
     <div className="preview-box">
