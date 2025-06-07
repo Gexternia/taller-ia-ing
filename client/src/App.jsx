@@ -315,32 +315,32 @@ export default function App() {
             className="btn-primary"
             style={{ minWidth: "180px", fontSize: "1.1rem" }}
             onClick={() => {
-              if (cameraMode === "idle") startCamera();
-              else takeShot();
-            }}
+ if (cameraMode === "idle") {
+     setCameraMode("active");
+   } else {
+     takeShot();
+   }
+ }}
             disabled={isGenerating}
           >
             {cameraMode === "idle" ? "Activate Camera" : "Capture"}
           </button>
         </div>
-        
-        {/* --- Preview de cámara, siempre montado pero oculto hasta estar activo --- */}
- <div className="video-preview">
-   <video
-    ref={videoRef}
-   autoPlay
-    playsInline
-     muted
-     className="camera-preview"
-     style={{
-     width: "100%",
-      borderRadius: "0.75rem",
-      marginBottom: "1rem",
-     display: cameraMode === "active" ? "block" : "none"
-    }}
-   />
-   <canvas ref={canvasRef} className="hidden" />
- </div>
+
+        {/* --- Preview de cámara --- */}
+        {cameraMode === "active" && (
+  <div className="video-preview">
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted
+      className="camera-preview"
+      style={{ width: "100%", borderRadius: "0.75rem", marginBottom: "1rem" }}
+    />
+    <canvas ref={canvasRef} className="hidden" />
+  </div>
+)}
 
         {/* --- Upload section --- */}
         <div className="upload-section">
