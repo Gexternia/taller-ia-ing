@@ -14,46 +14,80 @@ export default function App() {
 
   const [originalDescription, setOriginalDescription] = useState("");
   const [prevImageUrl, setPrevImageUrl]               = useState("");
-  const [showColorOptions, setShowColorOptions]   = useState(false);
-  const [showChatBox, setShowChatBox]             = useState(false);
-  const [showTitleOptions, setShowTitleOptions]   = useState(false);
-  const [chatText, setChatText]                   = useState("");
-  const [currentScreen, setCurrentScreen] = useState("welcome");
-  const [cameraMode, setCameraMode] = useState("idle"); // "idle" | "active"
-  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [showColorOptions, setShowColorOptions]       = useState(false);
+  const [showChatBox, setShowChatBox]                 = useState(false);
+  const [showTitleOptions, setShowTitleOptions]       = useState(false);
+  const [chatText, setChatText]                       = useState("");
+  const [currentScreen, setCurrentScreen]             = useState("welcome");
+  const [cameraMode, setCameraMode]                   = useState("idle"); // "idle" | "active"
+  const [isCameraOn, setIsCameraOn]                   = useState(false);
 
-// ==== Cámara ====
+  // ==== generate(): envía la imagen a /api/generate y actualiza estados ====
+  async function generate() {
+    if (!captured) return;
+
+    setIsGenerating(true);
+    setCurrentScreen("generating");
+
+    // Preparamos FormData con el archivo
+    const form = new FormData();
+    form.append("image", captured);
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: form
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        alert("Error generando ilustración: " + data.error);
+        setIsGenerating(false);
+        setCurrentScreen("capture");
+        return;
+      }
+
+      // Actualizamos todos los estados con la respuesta del backend
+      setResultUrl(data.resultUrl);
+      setBrandRefs(data.brandRefs || []);
+      setResponseId(data.responseId);
+      setImageCallId(data.imageCallId);
+      setOriginalDescription(data.description || "");
+      setPrevImageUrl(data.resultUrl);
+
+      // Pasamos a pantalla de resultado
+      setCurrentScreen("result");
+    } catch (err) {
+      console.error("generate error:", err);
+      alert("Ha ocurrido un error de red al generar la imagen.");
+      setCurrentScreen("capture");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  // ==== Cámara ====
 
   async function startCamera() {
-    // Si ya había un stream activo, lo detenemos primero
-    if (videoRef.current?.srcObject) {
-      stopCamera();
-    }
+    if (videoRef.current?.srcObject) stopCamera();
     try {
-      // Solo vídeo (sin audio), preferimos la trasera
-      const constraints = {
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      };
+      const constraints = { video: { facingMode: { ideal: "environment" } }, audio: false };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
       const video = videoRef.current;
       video.srcObject   = stream;
-      video.muted       = true;      // evitar pedir permiso de audio
-      video.playsInline = true;      // inline en iOS
-      await video.play();            // arranca el vídeo
-
+      video.muted       = true;
+      video.playsInline = true;
+      await video.play();
       setCameraMode("active");
       setIsCameraOn(true);
     } catch (e) {
       console.error("getUserMedia error:", e);
-      if (e.name === "NotAllowedError") {
-        alert("Permiso denegado para acceder a la cámara. Actívalo en la configuración del navegador.");
-      } else if (e.name === "NotFoundError" || e.name === "OverconstrainedError") {
-        alert("No se encontró cámara disponible o está siendo usada por otra app.");
-      } else {
-        alert("No se pudo activar la cámara. Prueba cerrar otras apps o revisa permisos del navegador.");
-      }
+      const msg = e.name === "NotAllowedError"
+        ? "Permiso denegado para la cámara."
+        : e.name === "NotFoundError"
+        ? "No se encontró cámara disponible."
+        : "No se pudo activar la cámara.";
+      alert(msg);
       setCameraMode("idle");
       setIsCameraOn(false);
     }
@@ -62,16 +96,13 @@ export default function App() {
   function takeShot() {
     const video  = videoRef.current;
     const canvas = canvasRef.current;
-
-    if (!video || !video.videoWidth || !video.videoHeight) {
-      alert("La cámara no está lista todavía. Espera un momento.");
+    if (!video || !video.videoWidth) {
+      alert("La cámara no está lista.");
       return;
     }
-
     canvas.width  = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-
+    canvas.getContext("2d").drawImage(video, 0, 0);
     canvas.toBlob(blob => {
       setCaptured(blob);
       stopCamera();
@@ -81,7 +112,7 @@ export default function App() {
   function stopCamera() {
     const video = videoRef.current;
     if (video?.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
+      video.srcObject.getTracks().forEach(t => t.stop());
       video.srcObject = null;
     }
     setCameraMode("idle");
@@ -103,54 +134,7 @@ export default function App() {
     }
     setIsGenerating(true);
 
-    // Sugerir título IA
-    if (action === "suggest_title") {
-      const res = await fetch("/api/iterate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          previousResponseId: responseId,
-          imageCallId,
-          action,
-          originalDescription: { text: originalDescription, prevImageUrl }
-        })
-      });
-      const { suggestedTitle, error } = await res.json();
-      if (error) {
-        alert("Error: " + error);
-        setIsGenerating(false);
-        return;
-      }
-      const userTitle = window.prompt(
-        "¿Te gusta este título? Si quieres editarlo:",
-        suggestedTitle
-      );
-      if (userTitle) {
-        await iterate("add_title", userTitle);
-      } else {
-        setIsGenerating(false);
-      }
-      return;
-    }
-
-    // Añadir título libre
-    if (action === "add_title" && !param) {
-      const userTitle = window.prompt("Escribe el título que quieras añadir:");
-      if (!userTitle) {
-        setIsGenerating(false);
-        return;
-      }
-      param = userTitle;
-    }
-
-    // Modificación vía chat
-    if (action === "chat" && !param) {
-      alert("Escribe algo en el cuadro de chat antes de enviar");
-      setIsGenerating(false);
-      return;
-    }
-
-    // Llamada normal de iteración
+    // payload común
     const payload = {
       previousResponseId: responseId,
       imageCallId,
@@ -159,29 +143,46 @@ export default function App() {
     };
     if (param) payload.actionParam = param;
 
-    const res = await fetch("/api/iterate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
+    try {
+      // flujo suggest_title
+      if (action === "suggest_title") {
+        const res = await fetch("/api/iterate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const { suggestedTitle, error } = await res.json();
+        if (error) throw new Error(error);
+        const userTitle = window.prompt("¿Te gusta este título? Edítalo si quieres:", suggestedTitle);
+        if (userTitle) {
+          await iterate("add_title", userTitle);
+        }
+        return;
+      }
 
-    if (data.error) {
-      alert("Error en iteración: " + data.error);
+      // llamada genérica de iteración
+      const res = await fetch("/api/iterate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setResultUrl(data.resultUrl);
+      setResponseId(data.responseId);
+      setImageCallId(data.imageCallId);
+      setPrevImageUrl(data.resultUrl);
+      setShowColorOptions(false);
+      setShowChatBox(false);
+      setShowTitleOptions(false);
+      setChatText("");
+    } catch (err) {
+      console.error("iterate error:", err);
+      alert("Error en iteración: " + err.message);
+    } finally {
       setIsGenerating(false);
-      return;
     }
-
-    setResultUrl(data.resultUrl);
-    setResponseId(data.responseId);
-    setImageCallId(data.imageCallId);
-    setPrevImageUrl(data.resultUrl);
-    setIsGenerating(false);
-
-    setShowColorOptions(false);
-    setShowChatBox(false);
-    setShowTitleOptions(false);
-    setChatText("");
   }
 
   // ==== Reiniciar ====
@@ -200,7 +201,6 @@ export default function App() {
     setCurrentScreen("welcome");
     stopCamera();
   }
-
   // =========================== RENDER PANTALLAS ===========================
 
   // --- Header fijo ING ---
