@@ -239,16 +239,7 @@ const CaptureScreen = () => (
           Take a photo or upload your sketch to generate an ING-style illustration.
         </p>
         <button
-          className="btn-primary"
-          style={{
-            backgroundColor: "#FFFFFF",
-            color: "#FF6200",
-            padding: "0.75rem 1.5rem",
-            borderRadius: "9999px",
-            fontWeight: 600,
-            fontSize: "1rem",
-            cursor: "pointer",
-          }}
+          className="btn-secondary"
           onClick={() => setCurrentScreen("capture")}
         >
           Get Started →

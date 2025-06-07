@@ -82,6 +82,23 @@ img { max-width:100%; height:auto; display:block; }
   background:linear-gradient(to top, rgba(0,0,0,0.2), transparent);
 }
 
+/* === BOTÓN SECUNDARIO (para pantallas como Capture) === */
+.btn-secondary {
+  background: #fff;
+  color: #FF6200;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transition: 0.2s, transform 0.2s;
+}
+.btn-secondary:hover {
+  background: #ffe5d9;
+  color: #c24e00;
+  transform: scale(1.02);
+}
+
 /* === 6) CAPTURE SCREEN === */
 .capture-container { display:flex; min-height:100vh; }
 .capture-left {
