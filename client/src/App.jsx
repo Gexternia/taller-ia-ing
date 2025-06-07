@@ -1,9 +1,7 @@
-import { useRef, useState, useEffect } from "react";
+import { useState } from "react";
 import "./styles.css";
 
 export default function App() {
-  const videoRef   = useRef(null);
-  const canvasRef  = useRef(null);
 
   const [captured, setCaptured]         = useState(null);
   const [resultUrl, setResultUrl]       = useState(null);
@@ -19,56 +17,8 @@ export default function App() {
   const [showTitleOptions, setShowTitleOptions]       = useState(false);
   const [chatText, setChatText]                       = useState("");
   const [currentScreen, setCurrentScreen]             = useState("welcome");
-  const [cameraMode, setCameraMode]                   = useState("idle"); // "idle" | "active"
-  const [isCameraOn, setIsCameraOn]                   = useState(false);
-  const [isCameraReady, setIsCameraReady]             = useState(false);
 
-  // ─── Arranque y parada automática de la cámara ───
-  useEffect(() => {
-    if (cameraMode !== "active") return;
-
-    let streamRef;
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
-      .then((stream) => {
-        streamRef = stream;
-        const video = videoRef.current;
-        if (!video) return;
-
-        video.srcObject   = stream;
-        video.muted       = true;
-        video.playsInline = true;
-        setIsCameraReady(false);
-
-        return video.play();
-      })
-      .then(() => {
-        setIsCameraOn(true);
-      })
-      .catch((e) => {
-        console.error("getUserMedia error:", e);
-        const msg =
-          e.name === "NotAllowedError" ? "Permiso denegado para la cámara." :
-          e.name === "NotFoundError"   ? "No se encontró cámara disponible." :
-                                         "No se pudo activar la cámara.";
-        alert(msg);
-        setCameraMode("idle");
-      });
-
-    return () => {
-      // limpia tracks
-      if (streamRef) {
-        streamRef.getTracks().forEach((t) => t.stop());
-      }
-      const video = videoRef.current;
-      if (video) {
-        video.srcObject = null;
-      }
-      setIsCameraOn(false);
-      setIsCameraReady(false);
-    };
-  }, [cameraMode]);
-
+ 
   // ==== generate(): envía la imagen a /api/generate y actualiza estados ====
   async function generate() {
     if (!captured) return;
@@ -100,43 +50,6 @@ export default function App() {
       setIsGenerating(false);
     }
   }
-
-  // ==== Cámara ====
-    function startCamera() {
-    setCameraMode("active");
-  }
-  function takeShot() {
-  if (!isCameraReady) {
-    alert("La cámara aún no está lista.");
-    return;
-  }
-  const video  = videoRef.current;
-  const canvas = canvasRef.current;
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-
-  canvas.toBlob((blob) => {
-    console.log("Blob capturado:", blob);
-    setCaptured(blob);
-    stopCamera();
-  }, "image/png");
- }  // ← Aquí cierra takeShot
-
-function stopCamera() {
-  setCameraMode("idle");
-  setIsCameraOn(false);
-  setIsCameraReady(false);
-}
-
-// ► vuelve a añadir esta función:
-function onFile(e) {
-  if (e.target.files?.[0]) {
-    setCaptured(e.target.files[0]);
-    stopCamera();
-  }
-}
-
 
   // ==== Iteraciones ====
   async function iterate(action, param) {
@@ -298,36 +211,45 @@ const CaptureScreen = () => (
     </div>
 
     {/* DERECHA */}
-    <div className="capture-right">
-      <div className="camera-controls" style={{ margin: "1.5rem 0" }}>
-        <button
-          className="btn-primary"
-          style={{ minWidth: "180px", fontSize: "1.1rem" }}
-          onClick={() => (cameraMode === "idle" ? startCamera() : takeShot())}
-          disabled={isGenerating || (cameraMode === "active" && !isCameraReady)}
-        >
-          {cameraMode === "idle" ? "Activate Camera" : "Capture"}
-        </button>
-      </div>
+ <div className="capture-right">
+  {/* Input que abre la cámara en móvil o el selector de archivos en desktop */}
+  <div className="upload-section">
+    <label
+      className="upload-btn"
+      htmlFor="file-upload"
+      style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}
+    >
+      {captured ? "Change Image" : "Take Photo / Upload"}
+      <input
+        id="file-upload"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={onFile}
+        hidden
+        disabled={isGenerating}
+      />
+    </label>
+  </div>
 
-      {/* Preview de cámara */}
-      {cameraMode === "active" && (
-        <div className="video-preview">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="camera-preview"
-            onLoadedMetadata={() => setIsCameraReady(true)}
-            style={{
-              width: "100%",
-              borderRadius: "0.75rem",
-              marginBottom: "1rem",
-              backgroundColor: "#000",
-            }}
-          />
-        </div>
+  {/* Preview de la imagen capturada o subida */}
+  {captured && (
+    <div className="preview-box">
+      <img src={URL.createObjectURL(captured)} alt="Preview" />
+    </div>
+  )}
+
+  {/* Botón para enviar al backend */}
+  <button
+    className="btn-primary"
+    style={{ width: "100%", fontSize: "1.11rem", marginTop: "1rem" }}
+    onClick={generate}
+    disabled={!captured || isGenerating}
+  >
+    {isGenerating ? "Generating…" : "Generate Illustration"}
+  </button>
+ </div>
+
       )}
 
       {/* Canal off-screen para capturar el frame */}
