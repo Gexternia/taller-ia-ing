@@ -203,81 +203,71 @@ const CaptureScreen = () => (
     style={{
       display: "flex",
       minHeight: "100vh",
+      paddingTop: 0,     // ya no hace falta compensar el header
     }}
   >
     <Header />
 
-    {/* IZQUIERDA: texto + botón + foto */}
+    {/* IZQUIERDA: texto arriba, foto abajo */}
     <div
       className="capture-left"
       style={{
         flex: 1,
-        backgroundColor: "#FF6200",
-        color: "#FFFFFF",
-        padding: "2rem",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
         borderTopLeftRadius: "1rem",
         borderBottomLeftRadius: "1rem",
+        overflow: "hidden",
       }}
     >
-      <div>
-        <h2
-          style={{
-            fontSize: "2rem",
-            fontWeight: 700,
-            lineHeight: 1.2,
-            marginBottom: "1rem",
-          }}
-        >
+      {/* Zona de texto */}
+      <div
+        style={{
+          backgroundColor: "#FF6200",
+          color: "#FFF",
+          padding: "3rem 2rem",
+          flex: "0 0 auto",
+        }}
+      >
+        <h2 style={{ fontSize: "2.5rem", lineHeight: 1.2, marginBottom: "1rem" }}>
           Take a photo.<br />
-          Transform<br />
-          your strategy.
+          Transform your strategy.
         </h2>
-        <p style={{ fontSize: "1rem", marginBottom: "1.5rem", maxWidth: "20rem" }}>
+        <p style={{ fontSize: "1.125rem" }}>
           Take a photo or upload your sketch to generate an ING-style illustration.
         </p>
-        <button
-          className="btn-secondary"
-          onClick={() => setCurrentScreen("capture")}
-        >
-          Get Started →
-        </button>
       </div>
-      <img
-        src="/images/foto2.jpg"
-        alt="Inspirational"
+
+      {/* Zona de foto con parallax */}
+      <div
         style={{
-          width: "1000%",
-          borderRadius: "0.75rem",
-          marginTop: "2rem",
-          objectFit: "cover",
+          flex: 1,
+          backgroundImage: "url('/images/foto2.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundAttachment: "fixed",
         }}
       />
     </div>
 
-    {/* DERECHA: Take Photo / Upload + preview + Generate */}
+    {/* DERECHA: selector + preview + botón Generate */}
     <div
       className="capture-right"
       style={{
         flex: 1,
-        padding: "2rem",
+        backgroundColor: "#FEF3EE",
+        padding: "4rem 3rem",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#FEF3EE",
+        justifyContent: "flex-start",
         borderTopRightRadius: "1rem",
         borderBottomRightRadius: "1rem",
       }}
     >
-      <div className="upload-section">
-        <label
-          className="upload-btn"
-          htmlFor="file-upload"
-          style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}
-        >
+      {/* Input cámara / upload */}
+      <div className="upload-section" style={{ marginBottom: "2rem" }}>
+        <label className="upload-btn" htmlFor="file-upload">
           {captured ? "Change Image" : "Take Photo / Upload"}
           <input
             id="file-upload"
@@ -291,8 +281,9 @@ const CaptureScreen = () => (
         </label>
       </div>
 
+      {/* Preview */}
       {captured && (
-        <div className="preview-box" style={{ margin: "1rem 0" }}>
+        <div className="preview-box" style={{ marginBottom: "2rem", width: "100%" }}>
           <img
             src={URL.createObjectURL(captured)}
             alt="Preview"
@@ -301,13 +292,10 @@ const CaptureScreen = () => (
         </div>
       )}
 
+      {/* Generate Illustration */}
       <button
         className="btn-primary"
-        style={{
-          width: "100%",
-          fontSize: "1.11rem",
-          marginTop: "1rem",
-        }}
+        style={{ width: "100%", maxWidth: "360px" }}
         onClick={generate}
         disabled={!captured || isGenerating}
       >
@@ -316,6 +304,7 @@ const CaptureScreen = () => (
     </div>
   </div>
 );
+
 
   // --- Generating (pantalla intermedia, sin cambios) ---
   const GeneratingScreen = () => (
