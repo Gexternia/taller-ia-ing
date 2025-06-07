@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import "./styles.css";
 
 export default function App() {
@@ -21,6 +21,47 @@ export default function App() {
   const [currentScreen, setCurrentScreen]             = useState("welcome");
   const [cameraMode, setCameraMode]                   = useState("idle"); // "idle" | "active"
   const [isCameraOn, setIsCameraOn]                   = useState(false);
+
+    // ─── Arranque y parada automática de la cámara ───
+  useEffect(() => {
+    // Si no estamos en modo 'active', nada que hacer
+    if (cameraMode !== "active") return;
+
+    // Intentamos arrancar la cámara
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" }, audio: false })
+      .then(stream => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted      = true;
+          videoRef.current.playsInline= true;
+          return videoRef.current.play();
+        }
+      })
+      .then(() => {
+        setIsCameraOn(true);
+      })
+      .catch(e => {
+        console.error("getUserMedia error:", e);
+        const msg =
+          e.name === "NotAllowedError"  ? "Permiso denegado para la cámara."    :
+          e.name === "NotFoundError"    ? "No se encontró cámara disponible." :
+                                          "No se pudo activar la cámara.";
+        alert(msg);
+        setCameraMode("idle");
+        setIsCameraOn(false);
+      });
+
+    // Cleanup: cuando salimos de 'active', detenemos el stream
+    return () => {
+      const vid = videoRef.current;
+      if (vid?.srcObject) {
+        vid.srcObject.getTracks().forEach(t => t.stop());
+        vid.srcObject = null;
+      }
+      setIsCameraOn(false);
+    };
+  }, [cameraMode]);
 
   // ==== generate(): envía la imagen a /api/generate y actualiza estados ====
   async function generate() {
@@ -67,32 +108,9 @@ export default function App() {
   }
 
   // ==== Cámara ====
-
-  async function startCamera() {
-    if (videoRef.current?.srcObject) stopCamera();
-    try {
-      const constraints = { video: { facingMode: { ideal: "environment" } }, audio: false };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      const video = videoRef.current;
-      video.srcObject   = stream;
-      video.muted       = true;
-      video.playsInline = true;
-      await video.play();
-      setCameraMode("active");
-      setIsCameraOn(true);
-    } catch (e) {
-      console.error("getUserMedia error:", e);
-      const msg = e.name === "NotAllowedError"
-        ? "Permiso denegado para la cámara."
-        : e.name === "NotFoundError"
-        ? "No se encontró cámara disponible."
-        : "No se pudo activar la cámara.";
-      alert(msg);
-      setCameraMode("idle");
-      setIsCameraOn(false);
-    }
+  function startCamera() {
+    setCameraMode("active");
   }
-
   function takeShot() {
     const video  = videoRef.current;
     const canvas = canvasRef.current;
@@ -316,7 +334,7 @@ export default function App() {
             style={{ minWidth: "180px", fontSize: "1.1rem" }}
             onClick={() => {
  if (cameraMode === "idle") {
-     setCameraMode("active");
+     startCamera();
    } else {
      takeShot();
    }
