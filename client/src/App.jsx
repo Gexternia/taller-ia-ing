@@ -25,24 +25,20 @@ export default function App() {
   // ==== Cámara ====
 
   async function startCamera() {
-    // Si ya había un stream activo, lo detenemos primero
     if (videoRef.current?.srcObject) {
       stopCamera();
     }
     try {
-      // Solo vídeo (sin audio), preferimos la trasera
       const constraints = {
         video: { facingMode: { ideal: "environment" } },
         audio: false
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
       const video = videoRef.current;
       video.srcObject   = stream;
-      video.muted       = true;      // evitar pedir permiso de audio
-      video.playsInline = true;      // inline en iOS
-      await video.play();            // arranca el vídeo
-
+      video.muted       = true;
+      video.playsInline = true;
+      await video.play();
       setCameraMode("active");
       setIsCameraOn(true);
     } catch (e) {
@@ -62,16 +58,13 @@ export default function App() {
   function takeShot() {
     const video  = videoRef.current;
     const canvas = canvasRef.current;
-
     if (!video || !video.videoWidth || !video.videoHeight) {
       alert("La cámara no está lista todavía. Espera un momento.");
       return;
     }
-
     canvas.width  = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-
     canvas.toBlob(blob => {
       setCaptured(blob);
       stopCamera();
@@ -146,7 +139,6 @@ export default function App() {
     }
     setIsGenerating(true);
 
-    // Sugerir título IA
     if (action === "suggest_title") {
       const res = await fetch("/api/iterate", {
         method: "POST",
@@ -164,10 +156,7 @@ export default function App() {
         setIsGenerating(false);
         return;
       }
-      const userTitle = window.prompt(
-        "¿Te gusta este título? Si quieres editarlo:",
-        suggestedTitle
-      );
+      const userTitle = window.prompt("¿Te gusta este título? Si quieres editarlo:", suggestedTitle);
       if (userTitle) {
         await iterate("add_title", userTitle);
       } else {
@@ -176,7 +165,6 @@ export default function App() {
       return;
     }
 
-    // Añadir título libre
     if (action === "add_title" && !param) {
       const userTitle = window.prompt("Escribe el título que quieras añadir:");
       if (!userTitle) {
@@ -186,14 +174,12 @@ export default function App() {
       param = userTitle;
     }
 
-    // Modificación vía chat
     if (action === "chat" && !param) {
       alert("Escribe algo en el cuadro de chat antes de enviar");
       setIsGenerating(false);
       return;
     }
 
-    // Llamada normal de iteración
     const payload = {
       previousResponseId: responseId,
       imageCallId,
@@ -264,8 +250,7 @@ export default function App() {
             if (resultUrl) setCurrentScreen("result");
             else alert("Primero genera una imagen");
           }}
-          className={currentScreen === "result" ? "active" : resultUrl ? "" : "disabled"}
-        >
+          className={currentScreen === "result" ? "active" : resultUrl ? "" : "disabled"}>
           Iteration
         </button>
         <button className="nav-link" onClick={() => window.open("https://form.typeform.com/to/Al1mzBDY", "_blank")}>
@@ -334,14 +319,13 @@ export default function App() {
       <div className="capture-right">
         <div className="camera-controls" style={{ marginTop: "1.5rem", marginBottom: "1.5rem", justifyContent: "flex-start" }}>
           <button
-            className="btn-primary"
+            className="btn_PRIMARY"
             style={{ minWidth: "180px", fontSize: "1.1rem" }}
             onClick={() => {
               if (cameraMode === "idle") startCamera();
               else takeShot();
             }}
-            disabled={isGenerating}
-          >
+            disabled={isGenerating}>
             {cameraMode === "idle" ? "Activate Camera" : "Capture"}
           </button>
         </div>
@@ -373,8 +357,7 @@ export default function App() {
           className="btn-primary"
           style={{ width: "100%", fontSize: "1.11rem", marginTop: "1rem" }}
           onClick={generate}
-          disabled={!captured || isGenerating}
-        >
+          disabled={!captured || isGenerating}>
           {isGenerating ? "Generating..." : "Generate Illustration"}
         </button>
       </div>
@@ -391,93 +374,28 @@ export default function App() {
   );
 
   const ResultScreen = () => (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#F7F7F7", padding: "2rem", gap: "
-  const ResultScreen = () => (
-    <div style={{
-      display: "flex",
-      minHeight: "100vh",
-      backgroundColor: "#F7F7F7",
-      padding: "2rem",
-      gap: "2rem"
-    }}>
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#F7F7F7", padding: "2rem", gap: "2rem" }}>
       <Header />
-
-      {/* IZQUIERDA: imagen y referencias */}
       <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "1rem",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-          overflow: "hidden",
-          position: "relative"
-        }}>
-          <div style={{
-            borderBottom: "1px solid #ECECEC",
-            padding: "1rem",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#333333" }}>
-              Your ING Illustration
-            </h2>
-            <a
-              href={resultUrl}
-              download="ilustracion_ing.png"
-              style={{
-                backgroundColor: "#FF6200",
-                color: "#ffffff",
-                padding: "0.75rem 1.25rem",
-                borderRadius: "0.75rem",
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                textDecoration: "none"
-              }}
-            >
+        <div style={{ background: "#ffffff", borderRadius: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.1)", overflow: "hidden", position: "relative" }}>
+          <div style={{ borderBottom: "1px solid #ECECEC", padding: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#333333" }}>Your ING Illustration</h2>
+            <a href={resultUrl} download="ilustracion_ing.png" style={{ backgroundColor: "#FF6200", color: "#ffffff", padding: "0.75rem 1.25rem", borderRadius: "0.75rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
               Download
             </a>
           </div>
           <div style={{ background: "#F7F7F7", padding: "1rem", display: "flex", justifyContent: "center" }}>
-            <img
-              src={resultUrl}
-              alt="Ilustración generada"
-              style={{ width: "100%", borderRadius: "0.75rem", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}
-            />
+            <img src={resultUrl} alt="Ilustración generada" style={{ width: "100%", borderRadius: "0.75rem", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }} />
           </div>
         </div>
-
         {brandRefs.length > 0 && (
-          <div style={{
-            background: "#ffffff",
-            borderRadius: "1rem",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            padding: "1rem"
-          }}>
-            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>
-              References
-            </h3>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(4rem,1fr))",
-              gap: "0.75rem"
-            }}>
+          <div style={{ background: "#ffffff", borderRadius: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.1)", padding: "1rem" }}>
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>References</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(4rem,1fr))", gap: "0.75rem" }}>
               {brandRefs.map((ref, idx) => (
                 <div key={idx} style={{ textAlign: "center" }}>
-                  <img
-                    src={ref.url}
-                    alt={ref.title}
-                    style={{ width: "100%", height: "4rem", objectFit: "cover", borderRadius: "0.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
-                  />
-                  <p style={{
-                    fontSize: "0.75rem",
-                    color: "#666666",
-                    marginTop: "0.5rem",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}>
+                  <img src={ref.url} alt={ref.title} style={{ width: "100%", height: "4rem", objectFit: "cover", borderRadius: "0.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }} />
+                  <p style={{ fontSize: "0.75rem", color: "#666666", marginTop: "0.5rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {ref.title}
                   </p>
                 </div>
@@ -486,62 +404,23 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* DERECHA: Personalización */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "1rem",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-          padding: "1rem"
-        }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>
-            Personalization
-          </h3>
-          {/* … aquí van los botones y sub-menús (igual que antes) … */}
+        <div style={{ background: "#ffffff", borderRadius: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.1)", padding: "1rem" }}>
+          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>Personalization</h3>
+          {/* aquí van los botones y sub-menús igual que antes */}
         </div>
-
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "1rem",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-          padding: "1rem"
-        }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>
-            Actions
-          </h3>
-          <button
-            onClick={generate}
-            disabled={isGenerating}
-            className="regenerate-btn"
-          >
+        <div style={{ background: "#ffffff", borderRadius: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.1)", padding: "1rem" }}>
+          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>Actions</h3>
+          <button onClick={generate} disabled={isGenerating} className="regenerate-btn">
             Regenerate Image
           </button>
         </div>
-
         {isGenerating && (
-          <div style={{
-            background: "#FFF8E1",
-            borderRadius: "1rem",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            padding: "1rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem"
-          }}>
-            <div style={{
-              width: "1.5rem",
-              height: "1.5rem",
-              border: "0.25rem solid #FF6200",
-              borderTopColor: "transparent",
-              borderRadius: "9999px",
-              animation: "spin 1s infinite linear"
-            }} />
+          <div style={{ background: "#FFF8E1", borderRadius: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.1)", padding: "1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ width: "1.5rem", height: "1.5rem", border: "0.25rem solid #FF6200", borderTopColor: "transparent", borderRadius: "9999px", animation: "spin 1s infinite linear" }} />
             <div>
               <span style={{ fontWeight: 600, color: "#FF8A00" }}>Processing…</span>
-              <p style={{ fontSize: "0.875rem", color: "#FF8A00", marginTop: "0.25rem" }}>
-                Applying changes, please wait.
-              </p>
+              <p style={{ fontSize: "0.875rem", color: "#FF8A00", marginTop: "0.25rem" }}>Applying changes, please wait.</p>
             </div>
           </div>
         )}
@@ -549,11 +428,9 @@ export default function App() {
     </div>
   );
 
-  // --- Switch de pantallas ---
-  if (currentScreen === "welcome")   return <WelcomeScreen />;
-  if (currentScreen === "capture")   return <CaptureScreen />;
-  if (currentScreen === "generating")return <GeneratingScreen />;
-  if (currentScreen === "result")    return <ResultScreen />;
-
+  if (currentScreen === "welcome")    return <WelcomeScreen />;
+  if (currentScreen === "capture")    return <CaptureScreen />;
+  if (currentScreen === "generating") return <GeneratingScreen />;
+  if (currentScreen === "result")     return <ResultScreen />;
   return <WelcomeScreen />;
 }
