@@ -284,75 +284,59 @@ function onFile(e) {
     </div>
   </div>
 );
-  // --- Capture ---
-  const CaptureScreen = () => (
-    <div className="capture-container">
-      <Header />
+// --- Capture ---
+const CaptureScreen = () => (
+  <div className="capture-container">
+    <Header />
 
-      {/* IZQUIERDA (naranja, con dos zonas: texto arriba, foto abajo) */}
-      <div className="capture-left" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem", marginTop: "2rem" }}>
-            Capture Your<br />Strategy
-          </h1>
-          <p style={{ fontSize: "1.18rem", fontWeight: 500 }}>
-            Take a photo or upload your sketch.<br />
-            <span style={{ fontSize: "1rem", color: "#ffd6c2", fontWeight: 400 }}>
-              You will get an ING-style illustration!
-            </span>
-          </p>
-        </div>
-        <div style={{ marginBottom: "1.5rem", marginTop: "2rem" }}>
-          <img
-            src="/images/foto2.jpg"
-            alt="Ejemplo ING"
-            style={{
-              width: "95%",
-              maxWidth: "320px",
-              borderRadius: "1.2rem",
-              boxShadow: "0 2px 16px rgba(60,0,0,0.08)",
-              border: "3px solid #fff6",
-              marginLeft: "auto",
-              marginRight: "auto",
-              display: "block"
-            }}
-          />
-        </div>
+    {/* IZQUIERDA */}
+    <div className="capture-left" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      { /* ... tu contenido ... */ }
+    </div>
+
+    {/* DERECHA */}
+    <div className="capture-right">
+      <div className="camera-controls" style={{ margin: "1.5rem 0" }}>
+        <button
+          className="btn-primary"
+          style={{ minWidth: "180px", fontSize: "1.1rem" }}
+          onClick={() => cameraMode === "idle" ? startCamera() : takeShot()}
+          disabled={isGenerating || (cameraMode === "active" && !isCameraReady)}
+        >
+          {cameraMode === "idle" ? "Activate Camera" : "Capture"}
+        </button>
       </div>
 
-      {/* DERECHA */}
-      <div className="capture-right">
+      {/* Preview de cámara */}
+      {cameraMode === "active" && (
+        <div className="video-preview">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="camera-preview"
+            onLoadedMetadata={() => setIsCameraReady(true)}
+            style={{ width: "100%", borderRadius: "0.75rem", marginBottom: "1rem", backgroundColor: "#000" }}
+          />
+        </div>
+      )}
 
-<div className="camera-controls" style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>
-  <button
-    className="btn-primary"
-    style={{ minWidth: "180px", fontSize: "1.1rem" }}
-    onClick={() => cameraMode === "idle" ? startCamera() : takeShot()}
-    disabled={
-      isGenerating ||
-      (cameraMode === "active" && !isCameraReady)
-    }
-  >
-    {cameraMode === "idle" ? "Activate Camera" : "Capture"}
-  </button>
-</div>
+      {/* Siempre montamos este canvas, aunque esté oculto */}
+      <canvas
+        ref={canvasRef}
+        style={{ display: "none" }}
+      />
 
-
-        {/* --- Preview de cámara --- */}
-        {cameraMode === "active" && (
-  <div className="video-preview">
-    <video
-       ref={videoRef}
-       autoPlay
-       muted
-       playsInline
-       className="camera-preview"
-       onLoadedMetadata={() => setIsCameraReady(true)}
-            />
-             <canvas ref={canvasRef} className="hidden" />
-       
+      {/* Upload section, preview, botón generar... */}
+      <div className="upload-section">…</div>
+      {captured && <div className="preview-box"><img src={URL.createObjectURL(captured)} alt="Preview" /></div>}
+      <button className="btn-primary" onClick={generate} disabled={!captured || isGenerating}>
+        {isGenerating ? "Generating…" : "Generate Illustration"}
+      </button>
+    </div>
   </div>
-)}
+);
 
         {/* --- Upload section --- */}
         <div className="upload-section">
