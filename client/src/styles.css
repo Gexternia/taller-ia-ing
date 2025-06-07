@@ -1,61 +1,44 @@
-/* client/src/styles.css */
-
 /* === 1) DECLARACIÓN DE LA FUENTE INGdisplay-Bold === */
 @font-face {
   font-family: 'INGdisplay-Bold';
   src: url('/fonts/INGdisplay-Bold.woff2') format('woff2'),
-       url('/fonts/INGdisplay-Bold.woff') format('woff');
+       url('/fonts/INGdisplay-Bold.woff')  format('woff');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
-/* ================================================== */
 
-/* === 2) ESTILOS GLOBALES BÁSICOS ==================== */
+/* === 2) ESTILOS GLOBALES BÁSICOS === */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
-
 body {
   font-family: 'INGdisplay-Bold', system-ui, sans-serif;
   background-color: #ffffff;
   color: #333333;
   line-height: 1.5;
 }
-
-/* Opcional: clases utilitarias básicas (puedes extenderlas) */
-.hidden {
-  display: none;
-}
-
-button,
-input,
-textarea {
+.hidden { display: none; }
+button, input, textarea {
   font-family: inherit;
   font-size: 1rem;
   padding: 0.6rem 1rem;
   border: none;
   cursor: pointer;
 }
-
 a {
   text-decoration: none;
   color: inherit;
 }
-
 img {
   max-width: 100%;
   height: auto;
   display: block;
 }
 
-/* ================================================== */
-
-/* === 3) ESTILOS ESPECÍFICOS DE FRONT “ING STYLE” ==== */
-
-/* HEADER FIJO */
+/* === 3) HEADER FIJO (centrado, borde redondeado) === */
 .header {
   position: fixed;
   top: 1rem;
@@ -63,131 +46,209 @@ img {
   transform: translateX(-50%);
   z-index: 50;
   background-color: #ffffff;
-  border-radius: 9999px; /* redondeado completo */
+  border-radius: 9999px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   padding: 0.75rem 1.5rem;
   gap: 2rem;
 }
-
-/* LOGO ING + ICONO LEÓN */
 .header .logo-container {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-
-.header .logo-container .logo-box {
-  width: 2rem;
-  height: 2rem;
-  background-color: #FF6200; /* naranja ING */
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.header .logo-container img {
+  height: 1.5rem;
 }
-
-.header .logo-container .logo-box span {
-  color: #ffffff;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-/* NAVEGACIÓN */
 .header nav {
   display: flex;
   gap: 1.5rem;
 }
-
-.header nav button {
+.header nav button,
+.header nav a {
   background: none;
   font-size: 0.875rem;
   font-weight: 500;
   color: #555555;
   transition: color 0.2s;
 }
-
 .header nav button.active,
-.header nav button:hover {
+.header nav button:hover,
+.header nav a:hover {
   color: #FF6200;
 }
-
 .header .reiniciar-btn {
   margin-left: auto;
   font-size: 0.875rem;
   color: #555555;
 }
-
 .header .reiniciar-btn:hover {
   color: #333333;
 }
 
-/* PANTALLA DE BIENVENIDA: CONTENEDORES */
+/* === 4) SPINNER Y PULSACIÓN === */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity: .4 } 50% { opacity: 1 } }
+.spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 0.5rem solid rgba(0,0,0,0.1);
+  border-top-color: #FF6200;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 2rem auto;
+}
+
+/* === 5) WELCOME SCREEN === */
 .welcome-container {
   display: flex;
   min-height: 100vh;
 }
-
-/* Izquierda en naranja */
 .welcome-left {
   flex: 1;
-  background-color: #FF6200; /* ING orange */
+  background-color: #FF6200;
   color: #ffffff;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 4rem;
 }
-
 .welcome-left h1 {
   font-size: 3rem;
   line-height: 1.2;
   margin-bottom: 1.5rem;
 }
-
 .welcome-left p {
   font-size: 1.125rem;
   line-height: 1.5;
   margin-bottom: 2rem;
 }
-
-.welcome-left .btn-primary {
+.btn-primary {
   background-color: #ffffff;
   color: #FF6200;
   font-size: 1.125rem;
   font-weight: 600;
   padding: 1rem 2rem;
-  border-radius: 2rem 2rem 1rem 2rem; /* bordes curvos a mano */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 2rem 2rem 1rem 2rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   transition: background-color 0.2s, transform 0.2s;
 }
-
-.welcome-left .btn-primary:hover {
-  background-color: #ffe5d9; /* variante suave */
+.btn-primary:hover {
+  background-color: #ffe5d9;
   transform: scale(1.02);
 }
-
-/* Derecha con imagen */
 .welcome-right {
   flex: 1;
   position: relative;
   overflow: hidden;
 }
-
 .welcome-right img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   filter: brightness(0.9);
 }
-
-.welcome-right .overlay-gradient {
+.overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.2), transparent);
+  background: linear-gradient(to top, rgba(0,0,0,0.2), transparent);
 }
 
-/* =================================================== */
+/* === 6) CAPTURE SCREEN === */
+.capture-container {
+  display: flex;
+  min-height: 100vh;
+}
+.capture-left {
+  flex: 1;
+  background-color: #FF6200;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem;
+}
+.capture-right {
+  flex: 1;
+  background-color: #FFF0EB;
+  padding: 4rem;
+}
+.camera-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.camera-controls button {
+  flex: 1;
+}
+.preview-box {
+  background: rgba(255,255,255,0.1);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+.preview-box img {
+  background: #fff;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
 
+/* === 7) GENERATING SCREEN === */
+.generating-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+  padding-top: 64px;
+  background-color: #F7F7F7;
+}
+.generating-container h2 {
+  font-size: 1.875rem;
+  margin-top: 1rem;
+  color: #333333;
+}
+.generating-container p {
+  color: #666666;
+  max-width: 28rem;
+  text-align: center;
+  margin-top: 0.5rem;
+}
 
+/* === 8) RESULT SCREEN & ITERATION LOADER === */
+.result-container {
+  padding-top: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  background-color: #F7F7F7;
+  min-height: calc(100vh - 64px);
+}
+.result-box {
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  overflow: hidden;
+  max-width: 800px;
+  width: 100%;
+}
+.result-box img {
+  width: 100%;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.iter-loader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #FFF8E1;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.iter-loader .spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-width: 0.25rem;
+}
