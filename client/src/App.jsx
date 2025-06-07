@@ -284,9 +284,6 @@ function onFile(e) {
     </div>
   </div>
 );
-// --- Capture ---
-const CaptureScreen = () => (
-  <div className="capture-container">
     <Header />
 
     {/* IZQUIERDA */}
@@ -327,17 +324,6 @@ const CaptureScreen = () => (
         ref={canvasRef}
         style={{ display: "none" }}
       />
-
-      {/* Upload section, preview, botón generar... */}
-      <div className="upload-section">…</div>
-      {captured && <div className="preview-box"><img src={URL.createObjectURL(captured)} alt="Preview" /></div>}
-      <button className="btn-primary" onClick={generate} disabled={!captured || isGenerating}>
-        {isGenerating ? "Generating…" : "Generate Illustration"}
-      </button>
-    </div>
-  </div>
-);
-
         {/* --- Upload section --- */}
         <div className="upload-section">
           <label className="upload-btn" htmlFor="file-upload" style={{ fontSize: "1.15rem", border: "2px dashed #FF6200" }}>
@@ -370,7 +356,7 @@ const CaptureScreen = () => (
         </button>
       </div>
     </div>
-  );
+   );
 
   // --- Generating (pantalla intermedia, sin cambios) ---
   const GeneratingScreen = () => (
