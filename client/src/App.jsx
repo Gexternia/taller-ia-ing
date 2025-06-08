@@ -320,34 +320,15 @@ export default function App() {
     </div>
   ), [iterate, isGenerating]);
 
-  const ModifyAIMenu = useCallback(() => (
-    <div className="submenu">
-      <p className="submenu-title">Modify with AI</p>
-      <textarea
-        rows={3}
-        maxLength={250}
-        placeholder="Describe the changes you want to apply…"
-        value={chatText}
-        onChange={e => setChatText(e.target.value)}
-        disabled={isGenerating}
-        className="ai-textarea"
-      />
-      <div className="textarea-footer">
-        <span className="char-count">{chatText.length}/250 chars</span>
-        <button
-          onClick={() => {
-            iterate("chat", chatText);
-            setShowChatBox(false);
-            setChatText("");
-          }}
-          disabled={isGenerating || !chatText.trim()}
-          className="apply-btn"
-        >
-          Apply
-        </button>
-      </div>
-    </div>
-  ), [chatText, setChatText, iterate, isGenerating]);
+  const handleChatTextChange = useCallback((e) => {
+    setChatText(e.target.value);
+  }, []);
+
+  const handleChatSubmit = useCallback(() => {
+    iterate("chat", chatText);
+    setShowChatBox(false);
+    setChatText("");
+  }, [iterate, chatText]);
 
   const ResultScreen = useCallback(() => (
     <div className="result-container">
@@ -448,7 +429,30 @@ export default function App() {
 
             {showColorOptions && <ColorPalettesMenu />}
             {showTitleOptions && <TitleOptionsMenu />}
-            {showChatBox && <ModifyAIMenu />}
+            {showChatBox && (
+              <div className="submenu">
+                <p className="submenu-title">Modify with AI</p>
+                <textarea
+                  rows={3}
+                  maxLength={250}
+                  placeholder="Describe the changes you want to apply…"
+                  value={chatText}
+                  onChange={handleChatTextChange}
+                  disabled={isGenerating}
+                  className="ai-textarea"
+                />
+                <div className="textarea-footer">
+                  <span className="char-count">{chatText.length}/250 chars</span>
+                  <button
+                    onClick={handleChatSubmit}
+                    disabled={isGenerating || !chatText.trim()}
+                    className="apply-btn"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="actions-card">
