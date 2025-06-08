@@ -145,7 +145,7 @@ export default function App() {
 
   const Header = useMemo(() => () => (
     <div className="header">
-      <div className="logo-container">
+      <div className="logo-container" onClick={resetApp}>
         <img src="/images/logo.png" alt="ING Logo" />
       </div>
       <nav>
@@ -175,9 +175,6 @@ export default function App() {
           Voting
         </button>
       </nav>
-      <button className="reset-btn" onClick={resetApp}>
-        Reset
-      </button>
     </div>
   ), [currentScreen, resultUrl, handleNavigation, resetApp]);
 
@@ -256,7 +253,7 @@ export default function App() {
             onClick={generate}
             disabled={!captured || isGenerating}
           >
-            {isGenerating ? "Generating…" : "Generate Illustration"}
+            {isGenerating ? "Generating…" : "Generate Illustration →"}
           </button>
         </div>
       </div>

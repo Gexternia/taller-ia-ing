@@ -70,6 +70,15 @@ img {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.header .logo-container {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.header .logo-container:hover {
+  transform: scale(1.05);
+}
+
 .header .logo-container img { 
   height: 1.7rem; 
 }
@@ -102,24 +111,6 @@ img {
 .header nav button.nav-disabled {
   color: #ccc;
   cursor: not-allowed;
-}
-
-.reset-btn {
-  margin-left: auto; 
-  background: #fff4eb; 
-  color: #FF6200;
-  padding: 0.55rem 1.2rem; 
-  border-radius: 9999px;
-  border: 1px solid #FFB88A; 
-  font-weight: 600; 
-  transition: all 0.2s ease;
-}
-
-.reset-btn:hover {
-  background: #FF6200; 
-  color: #fff; 
-  border-color: #FF6200;
-  transform: translateY(-1px);
 }
 
 /* === 4) ANIMACIONES === */
@@ -280,21 +271,22 @@ img {
   align-items: center;
   text-align: center;
   padding: 4rem 2rem;
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, #FF6200 0%, #e55500 100%);
+  color: white;
 }
 
 .capture-info h2 {
   font-size: clamp(2rem, 4vw, 3rem);
   line-height: 1.1;
   margin-bottom: 1rem;
-  color: #333;
+  color: white;
 }
 
 .capture-info p {
   font-size: 1.25rem;
   margin-bottom: 2rem;
   max-width: 24rem;
-  color: #666;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .capture-bg {
@@ -308,14 +300,14 @@ img {
 .capture-right {
   flex: 1;
   background: linear-gradient(135deg, #FEF3EE 0%, #FDE8D7 100%);
-  padding: 4rem 3rem;
+  padding: 3rem 3rem 2rem 3rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   border-top-right-radius: 1rem;
   border-bottom-right-radius: 1rem;
-  gap: 2rem;
+  gap: 1.5rem;
   animation: fadeIn 0.6s ease-out 0.2s both;
 }
 
@@ -346,9 +338,9 @@ img {
 }
 
 .generate-btn {
-  margin-top: auto;
   width: 100%;
   max-width: 360px;
+  margin-top: 1rem;
 }
 
 /* === 8) GENERATING SCREEN === */
