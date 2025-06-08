@@ -1,26 +1,38 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import "./styles.css";
 
 export default function App() {
-
-  const [captured, setCaptured]         = useState(null);
-  const [resultUrl, setResultUrl]       = useState(null);
-  const [responseId, setResponseId]     = useState(null);
-  const [imageCallId, setImageCallId]   = useState(null);
-  const [brandRefs, setBrandRefs]       = useState([]);
+  const [captured, setCaptured] = useState(null);
+  const [resultUrl, setResultUrl] = useState(null);
+  const [responseId, setResponseId] = useState(null);
+  const [imageCallId, setImageCallId] = useState(null);
+  const [brandRefs, setBrandRefs] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [originalDescription, setOriginalDescription] = useState("");
-  const [prevImageUrl, setPrevImageUrl]               = useState("");
-  const [showColorOptions, setShowColorOptions]       = useState(false);
-  const [showChatBox, setShowChatBox]                 = useState(false);
-  const [showTitleOptions, setShowTitleOptions]       = useState(false);
-  const [chatText, setChatText]                       = useState("");
-  const [currentScreen, setCurrentScreen]             = useState("welcome");
+  const [prevImageUrl, setPrevImageUrl] = useState("");
+  const [showColorOptions, setShowColorOptions] = useState(false);
+  const [showChatBox, setShowChatBox] = useState(false);
+  const [showTitleOptions, setShowTitleOptions] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [currentScreen, setCurrentScreen] = useState("welcome");
 
- 
-  // ==== generate(): envía la imagen a /api/generate y actualiza estados ====
-  async function generate() {
+  const resetApp = useCallback(() => {
+    setCaptured(null);
+    setResultUrl(null);
+    setResponseId(null);
+    setImageCallId(null);
+    setBrandRefs([]);
+    setOriginalDescription("");
+    setPrevImageUrl("");
+    setShowColorOptions(false);
+    setShowChatBox(false);
+    setShowTitleOptions(false);
+    setChatText("");
+    setCurrentScreen("welcome");
+  }, []);
+
+  const generate = useCallback(async () => {
     if (!captured) return;
     setIsGenerating(true);
     setCurrentScreen("generating");
@@ -49,17 +61,15 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }
+  }, [captured]);
 
-  // ==== Iteraciones ====
-  async function iterate(action, param) {
+  const iterate = useCallback(async (action, param) => {
     if (!responseId || !imageCallId) {
       alert("Primero genera la imagen inicial");
       return;
     }
     setIsGenerating(true);
 
-    // payload común
     const payload = {
       previousResponseId: responseId,
       imageCallId,
@@ -69,7 +79,6 @@ export default function App() {
     if (param) payload.actionParam = param;
 
     try {
-      // flujo suggest_title
       if (action === "suggest_title") {
         const res = await fetch("/api/iterate", {
           method: "POST",
@@ -85,7 +94,13 @@ export default function App() {
         return;
       }
 
-      // llamada genérica de iteración
+      if (action === "add_title" && !param) {
+        const userTitle = window.prompt("Escribe el título que quieres añadir:");
+        if (!userTitle) return;
+        param = userTitle;
+        payload.actionParam = param;
+      }
+
       const res = await fetch("/api/iterate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,595 +123,359 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }
+  }, [responseId, imageCallId, originalDescription, prevImageUrl]);
 
-  // ==== Reiniciar ====
-  function resetApp() {
-    setCaptured(null);
-    setResultUrl(null);
-    setResponseId(null);
-    setImageCallId(null);
-    setBrandRefs([]);
-    setOriginalDescription("");
-    setPrevImageUrl("");
+  const closeAllSubmenus = useCallback(() => {
     setShowColorOptions(false);
     setShowChatBox(false);
     setShowTitleOptions(false);
-    setChatText("");
-    setCurrentScreen("welcome");
-  }
-  // =========================== RENDER PANTALLAS ===========================
+  }, []);
 
-  // --- Header fijo ING ---
-  const Header = () => (
+  const handleNavigation = useCallback((screen) => {
+    if (screen === "result" && !resultUrl) {
+      alert("Primero genera una imagen");
+      return;
+    }
+    setCurrentScreen(screen);
+  }, [resultUrl]);
+
+  const Header = useMemo(() => () => (
     <div className="header">
       <div className="logo-container">
         <img src="/images/logo.png" alt="ING Logo" />
       </div>
       <nav>
         <button
-          onClick={() => setCurrentScreen("welcome")}
+          onClick={() => handleNavigation("welcome")}
           className={currentScreen === "welcome" ? "active" : ""}
         >
           Home
         </button>
         <button
-          onClick={() => setCurrentScreen("capture")}
+          onClick={() => handleNavigation("capture")}
           className={currentScreen === "capture" ? "active" : ""}
         >
           Capture
         </button>
         <button
-          onClick={() => {
-            if (resultUrl) setCurrentScreen("result");
-            else alert("Primero genera una imagen");
-          }}
-          className={currentScreen === "result" ? "active" : resultUrl ? "" : "disabled"}
+          onClick={() => handleNavigation("result")}
+          className={`${currentScreen === "result" ? "active" : ""} ${!resultUrl ? "nav-disabled" : ""}`}
+          disabled={!resultUrl}
         >
           Iteration
         </button>
         <button
           className="nav-link"
-          onClick={() =>
-            window.open("https://form.typeform.com/to/Al1mzBDY", "_blank")
-          }
+          onClick={() => window.open("https://form.typeform.com/to/Al1mzBDY", "_blank")}
         >
           Voting
         </button>
       </nav>
-      <button className="reiniciar-btn" onClick={resetApp}>
+      <button className="reset-btn" onClick={resetApp}>
         Reset
       </button>
     </div>
-  );
+  ), [currentScreen, resultUrl, handleNavigation, resetApp]);
 
-  // --- Home / Welcome ---
-  const WelcomeScreen = () => (
-  <div className="welcome-container">
-    <Header />
-    <div className="welcome-left">
-      <h1>
-        Your strategy.<br />
-        Your style.<br />
-        Your illustration.
-      </h1>
-      <p>
-        Transform your ideas into professional illustrations with AI & ING style.
-      </p>
-      <button
-        className="btn-primary"
-        onClick={() => setCurrentScreen("capture")}
-      >
-        Get Started →
-      </button>
-    </div>
-    <div className="welcome-right">
-      <img src="/images/nueva-portada.jpg" alt="Team working" />
-      <div className="overlay-gradient"></div>
-    </div>
-  </div>
-);
-// --- CaptureScreen ---
-const CaptureScreen = () => (
-  <div
-    className="capture-container"
-    style={{ paddingTop: 0 /* ya no hace falta compensar el header */ }}
-  >
-    <Header />
-
-    {/* IZQUIERDA: texto centrado + fondo parallax */}
-    <div className="capture-left">
-      {/* Zona de texto */}
-      <div className="info">
-        <h2>
-          Take a photo.<br />
-          Transform your strategy.
-        </h2>
-        <p>
-          Take a photo or upload your sketch to generate an ING-style illustration.
-        </p>
-      </div>
-      {/* Zona de foto con parallax */}
-      <div className="bg" />
-    </div>
-
-    {/* DERECHA: selector + preview + botón Generate */}
-    <div className="capture-right">
-      {/* Input cámara / upload */}
-      <div className="upload-section">
-        <label className="upload-btn btn-secondary" htmlFor="file-upload">
-          {captured ? "Change Image" : "Take Photo / Upload"}
-          <input
-            id="file-upload"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={e => setCaptured(e.target.files[0])}
-            hidden
-            disabled={isGenerating}
-          />
-        </label>
-      </div>
-      
-      {/* Preview */}
-      {captured && (
-        <div className="preview-box">
-          <img
-            src={URL.createObjectURL(captured)}
-            alt="Preview"
-          />
-        </div>
-      )}
-
-      {/* Generate Illustration */}
-      <button
-        className="btn-primary"
-        onClick={generate}
-        disabled={!captured || isGenerating}
-      >
-        {isGenerating ? "Generating…" : "Generate Illustration"}
-      </button>
-    </div>
-  </div>
-);
-  // --- Generating (pantalla intermedia, sin cambios) ---
-  const GeneratingScreen = () => (
-    <div className="generating-container">
+  const WelcomeScreen = useCallback(() => (
+    <div className="welcome-container">
       <Header />
-      <div className="spinner"></div>
-      <h2>Generating your illustration…</h2>
-      <p>We’re analyzing and applying ING’s style.</p>
-    </div>
-  );
-
-  // --- Pantalla Resultado + Personalización (Iteration) ---
-  const ResultScreen = () => (
-    <div style={{
-      display: "flex",
-      minHeight: "100vh",
-      backgroundColor: "#F7F7F7",
-      padding: "2rem",
-      gap: "2rem"
-    }}>
-      <Header />
-
-      {/* IZQUIERDA: imagen y refs */}
-      <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "1rem",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-          overflow: "hidden",
-          position: "relative"
-        }}>
-          <div style={{
-            borderBottom: "1px solid #ECECEC",
-            padding: "1rem",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#333333" }}>
-              Your ING Illustration
-            </h2>
-            <a
-              href={resultUrl}
-              download="ilustracion_ing.png"
-              style={{
-                backgroundColor: "#FF6200",
-                color: "#ffffff",
-                padding: "0.75rem 1.25rem",
-                borderRadius: "0.75rem",
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                textDecoration: "none"
-              }}
-            >
-              Download
-            </a>
-          </div>
-          <div style={{ background: "#F7F7F7", padding: "1rem", display: "flex", justifyContent: "center" }}>
-            <img
-              src={resultUrl}
-              alt="Ilustración generada"
-              style={{ width: "100%", borderRadius: "0.75rem", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}
-            />
-          </div>
-        </div>
-        {/* Referencias */}
-        {brandRefs.length > 0 && (
-          <div style={{
-            background: "#ffffff",
-            borderRadius: "1rem",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            padding: "1rem"
-          }}>
-            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>
-              References
-            </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(4rem, 1fr))", gap: "0.75rem" }}>
-              {brandRefs.map((ref, index) => (
-                <div key={index} style={{ textAlign: "center" }}>
-                  <img
-                    src={ref.url}
-                    alt={ref.title}
-                    style={{ width: "100%", height: "4rem", objectFit: "cover", borderRadius: "0.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
-                  />
-                  <p style={{
-                    fontSize: "0.75rem",
-                    color: "#666666",
-                    marginTop: "0.5rem",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}>
-                    {ref.title}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* DERECHA: Personalización */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "1rem",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-          padding: "1rem"
-        }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>
-            Personalization
-          </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <button
-              onClick={() => {
-                setShowColorOptions(!showColorOptions);
-                setShowChatBox(false);
-                setShowTitleOptions(false);
-              }}
-              disabled={isGenerating}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: "#F7F7F7",
-                borderRadius: "0.75rem",
-                padding: "0.75rem",
-                gap: "0.75rem",
-                cursor: isGenerating ? "not-allowed" : "pointer",
-                opacity: isGenerating ? 0.5 : 1,
-                border: "none"
-              }}
-            >
-              <div style={{
-                width: "2.5rem",
-                height: "2.5rem",
-                background: "linear-gradient(to right, #FF6200, #A855F7)",
-                borderRadius: "0.5rem"
-              }}></div>
-              <div>
-                <p style={{ fontWeight: 600, color: "#333333" }}>Change Colors</p>
-                <p style={{ fontSize: "0.875rem", color: "#777777" }}>ING palettes</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                setShowTitleOptions(!showTitleOptions);
-                setShowColorOptions(false);
-                setShowChatBox(false);
-              }}
-              disabled={isGenerating}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: "#F7F7F7",
-                borderRadius: "0.75rem",
-                padding: "0.75rem",
-                gap: "0.75rem",
-                cursor: isGenerating ? "not-allowed" : "pointer",
-                opacity: isGenerating ? 0.5 : 1,
-                border: "none"
-              }}
-            >
-              <div style={{
-                width: "2.5rem",
-                height: "2.5rem",
-                background: "#EDE9FE",
-                borderRadius: "0.5rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}>
-                <svg style={{ width: "1.25rem", height: "1.25rem", color: "#7C3AED" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                </svg>
-              </div>
-              <div>
-                <p style={{ fontWeight: 600, color: "#333333" }}>Add Title</p>
-                <p style={{ fontSize: "0.875rem", color: "#777777" }}>Custom text</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                setShowChatBox(!showChatBox);
-                setShowColorOptions(false);
-                setShowTitleOptions(false);
-              }}
-              disabled={isGenerating}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: "#F7F7F7",
-                borderRadius: "0.75rem",
-                padding: "0.75rem",
-                gap: "0.75rem",
-                cursor: isGenerating ? "not-allowed" : "pointer",
-                opacity: isGenerating ? 0.5 : 1,
-                border: "none"
-              }}
-            >
-              <div style={{
-                width: "2.5rem",
-                height: "2.5rem",
-                background: "#E0F2FE",
-                borderRadius: "0.5rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}>
-                <svg style={{ width: "1.25rem", height: "1.25rem", color: "#0284C7" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <div>
-                <p style={{ fontWeight: 600, color: "#333333" }}>Modify with AI</p>
-                <p style={{ fontSize: "0.875rem", color: "#777777" }}>Custom instructions</p>
-              </div>
-            </button>
-          </div>
-
-          {/* Sub-menú Change colors */}
-          {showColorOptions && (
-            <div style={{
-              marginTop: "1rem",
-              background: "#F7F7F7",
-              borderRadius: "1rem",
-              padding: "1rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.75rem"
-            }}>
-              <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}>Palettes</p>
-              {[
-                { name: "Orange + Sky + Maroon + Blush", colors: ["#FF6200", "#89D6FD", "#4D0020", "#F689FD"] },
-                { name: "Orange + Maroon + Raspberry + Blush", colors: ["#FF6200", "#4D0020", "#D40199", "#F689FD"] },
-                { name: "Orange + Raspberry + Blush + Sun", colors: ["#FF6200", "#D40199", "#F689FD", "#FFE100"] },
-                { name: "Orange + Violet + Sky + Maroon", colors: ["#FF6200", "#7724FF", "#89D6FD", "#4D0020"] }
-              ].map((palette, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => iterate("change_palette", palette.colors.join(", "))}
-                  disabled={isGenerating}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    background: "#ffffff",
-                    borderRadius: "0.5rem",
-                    padding: "0.75rem",
-                    gap: "0.75rem",
-                    border: "1px solid #E5E7EB",
-                    cursor: isGenerating ? "not-allowed" : "pointer",
-                    opacity: isGenerating ? 0.5 : 1
-                  }}
-                >
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    {palette.colors.map((c, i) => (
-                      <span key={i} style={{
-                        width: "1rem",
-                        height: "1rem",
-                        background: c,
-                        borderRadius: "9999px"
-                      }}></span>
-                    ))}
-                  </div>
-                  <span style={{
-                    fontSize: "0.875rem",
-                    color: "#555555",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}>
-                    {palette.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Sub-menú Title */}
-          {showTitleOptions && (
-            <div style={{
-              marginTop: "1rem",
-              background: "#F7F7F7",
-              borderRadius: "1rem",
-              padding: "1rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.75rem"
-            }}>
-              <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}>Title options</p>
-              <button
-                onClick={() => iterate("add_title")}
-                disabled={isGenerating}
-                style={{
-                  background: "#ffffff",
-                  borderRadius: "0.5rem",
-                  padding: "0.75rem",
-                  textAlign: "left",
-                  border: "1px solid #E5E7EB",
-                  cursor: isGenerating ? "not-allowed" : "pointer",
-                  opacity: isGenerating ? 0.5 : 1
-                }}
-              >
-                Custom Title
-              </button>
-              <button
-                onClick={() => iterate("suggest_title")}
-                disabled={isGenerating}
-                style={{
-                  background: "#ffffff",
-                  borderRadius: "0.5rem",
-                  padding: "0.75rem",
-                  textAlign: "left",
-                  border: "1px solid #E5E7EB",
-                  cursor: isGenerating ? "not-allowed" : "pointer",
-                  opacity: isGenerating ? 0.5 : 1
-                }}
-              >
-                AI-generated Title
-              </button>
-            </div>
-          )}
-
-          {/* Sub-menú Modify AI */}
-
-{showChatBox && (
-  <div style={{
-    marginTop: "1rem",
-    background: "#F7F7F7",
-    borderRadius: "1rem",
-    padding: "1rem"
-  }}>
-    <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}> Modify with AI
-    </p>
-    {/* sólo actualiza chatText en el state, sin lanzar la iteración hasta pulsar Apply */}
-    <textarea
-      rows={3}
-      maxLength={250}
-      placeholder="Describe the changes you want to apply…"
-      value={chatText}
-      onChange={e => setChatText(e.target.value)}
-      disabled={isGenerating}
-      style={{
-        width: "100%",
-        padding: "0.75rem",
-        borderRadius: "0.5rem",
-        border: "1px solid #E5E7EB",
-        resize: "none",
-        fontFamily: "inherit",
-        marginBottom: "0.5rem"
-      }}
-    />
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontSize: "0.75rem", color: "#777777" }}>
-        {chatText.length}/250 chars
-      </span>
-      <button
-        onClick={() => {
-          iterate("chat", chatText);
-          setShowChatBox(false);
-          setChatText("");
-        }}
-        disabled={isGenerating || !chatText.trim()}
-        style={{
-          background: "#0284C7",
-          color: "#ffffff",
-          padding: "0.5rem 1rem",
-          borderRadius: "0.5rem",
-          cursor: (isGenerating || !chatText.trim()) ? "not-allowed" : "pointer",
-          opacity: (isGenerating || !chatText.trim()) ? 0.5 : 1
-        }}
-      >
-        Apply
-      </button>
-    </div>
-  </div>
-)}
-        </div>
-        {/* Botón Regenerar */}
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "1rem",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-          padding: "1rem"
-        }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#333333", marginBottom: "0.75rem" }}>
-            Actions
-          </h3>
+      <div className="welcome-content">
+        <div className="welcome-left">
+          <h1>
+            Your strategy.<br />
+            Your style.<br />
+            Your illustration.
+          </h1>
+          <p>
+            Transform your ideas into professional illustrations with AI & ING style.
+          </p>
           <button
-            onClick={generate}
-            disabled={isGenerating}
-            style={{
-              background: "#FF6200",
-              color: "#ffffff",
-              width: "100%",
-              padding: "0.75rem",
-              borderRadius: "0.75rem",
-              fontWeight: 600,
-              cursor: isGenerating ? "not-allowed" : "pointer",
-              opacity: isGenerating ? 0.5 : 1
-            }}
+            className="btn-primary"
+            onClick={() => setCurrentScreen("capture")}
           >
-            Regenerate Image
+            Get Started →
           </button>
         </div>
-        {isGenerating && (
-          <div style={{
-            background: "#FFF8E1",
-            borderRadius: "1rem",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            padding: "1rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem"
-          }}>
-            <div style={{
-              width: "1.5rem",
-              height: "1.5rem",
-              border: "0.25rem solid #FF6200",
-              borderTopColor: "transparent",
-              borderRadius: "9999px",
-              animation: "spin 1s infinite linear"
-            }}></div>
-            <div>
-              <span style={{ fontWeight: 600, color: "#FF8A00" }}>Processing…</span>
-              <p style={{ fontSize: "0.875rem", color: "#FF8A00", marginTop: "0.25rem" }}>
-                Applying changes, please wait.
-              </p>
-            </div>
-          </div>
-        )}
+        <div className="welcome-right">
+          <img src="/images/nueva-portada.jpg" alt="Team working" />
+          <div className="overlay-gradient"></div>
+        </div>
       </div>
     </div>
-  );
+  ), []);
 
-  // --- Switch de pantallas ---
+  const CaptureScreen = useCallback(() => (
+    <div className="capture-container">
+      <Header />
+      <div className="capture-content">
+        <div className="capture-left">
+          <div className="capture-info">
+            <h2>
+              Take a photo.<br />
+              Transform your strategy.
+            </h2>
+            <p>
+              Take a photo or upload your sketch to generate an ING-style illustration.
+            </p>
+          </div>
+          <div className="capture-bg" />
+        </div>
+
+        <div className="capture-right">
+          <div className="upload-section">
+            <label className="upload-btn btn-secondary" htmlFor="file-upload">
+              {captured ? "Change Image" : "Take Photo / Upload"}
+              <input
+                id="file-upload"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={e => setCaptured(e.target.files[0])}
+                hidden
+                disabled={isGenerating}
+              />
+            </label>
+          </div>
+          
+          {captured && (
+            <div className="preview-box">
+              <img
+                src={URL.createObjectURL(captured)}
+                alt="Preview"
+              />
+            </div>
+          )}
+
+          <button
+            className="btn-primary generate-btn"
+            onClick={generate}
+            disabled={!captured || isGenerating}
+          >
+            {isGenerating ? "Generating…" : "Generate Illustration"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ), [captured, isGenerating, generate]);
+
+  const GeneratingScreen = useCallback(() => (
+    <div className="generating-container">
+      <Header />
+      <div className="generating-content">
+        <div className="spinner"></div>
+        <h2>Generating your illustration…</h2>
+        <p>We're analyzing and applying ING's style.</p>
+      </div>
+    </div>
+  ), []);
+
+  const ColorPalettesMenu = useCallback(() => {
+    const palettes = [
+      { name: "Orange + Sky + Maroon + Blush", colors: ["#FF6200", "#89D6FD", "#4D0020", "#F689FD"] },
+      { name: "Orange + Maroon + Raspberry + Blush", colors: ["#FF6200", "#4D0020", "#D40199", "#F689FD"] },
+      { name: "Orange + Raspberry + Blush + Sun", colors: ["#FF6200", "#D40199", "#F689FD", "#FFE100"] },
+      { name: "Orange + Violet + Sky + Maroon", colors: ["#FF6200", "#7724FF", "#89D6FD", "#4D0020"] }
+    ];
+
+    return (
+      <div className="submenu">
+        <p className="submenu-title">Palettes</p>
+        {palettes.map((palette, idx) => (
+          <button
+            key={idx}
+            onClick={() => iterate("change_palette", palette.colors.join(", "))}
+            disabled={isGenerating}
+            className="palette-btn"
+          >
+            <div className="palette-colors">
+              {palette.colors.map((color, i) => (
+                <span key={i} className="color-dot" style={{ backgroundColor: color }}></span>
+              ))}
+            </div>
+            <span className="palette-name">{palette.name}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }, [iterate, isGenerating]);
+
+  const TitleOptionsMenu = useCallback(() => (
+    <div className="submenu">
+      <p className="submenu-title">Title options</p>
+      <button
+        onClick={() => iterate("add_title")}
+        disabled={isGenerating}
+        className="submenu-btn"
+      >
+        Custom Title
+      </button>
+      <button
+        onClick={() => iterate("suggest_title")}
+        disabled={isGenerating}
+        className="submenu-btn"
+      >
+        AI-generated Title
+      </button>
+    </div>
+  ), [iterate, isGenerating]);
+
+  const ModifyAIMenu = useCallback(() => (
+    <div className="submenu">
+      <p className="submenu-title">Modify with AI</p>
+      <textarea
+        rows={3}
+        maxLength={250}
+        placeholder="Describe the changes you want to apply…"
+        value={chatText}
+        onChange={e => setChatText(e.target.value)}
+        disabled={isGenerating}
+        className="ai-textarea"
+      />
+      <div className="textarea-footer">
+        <span className="char-count">{chatText.length}/250 chars</span>
+        <button
+          onClick={() => {
+            iterate("chat", chatText);
+            setShowChatBox(false);
+            setChatText("");
+          }}
+          disabled={isGenerating || !chatText.trim()}
+          className="apply-btn"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  ), [chatText, setChatText, iterate, isGenerating]);
+
+  const ResultScreen = useCallback(() => (
+    <div className="result-container">
+      <Header />
+      <div className="result-content">
+        <div className="result-left">
+          <div className="result-image-card">
+            <div className="card-header">
+              <h2>Your ING Illustration</h2>
+              <a
+                href={resultUrl}
+                download="ilustracion_ing.png"
+                className="download-btn"
+              >
+                Download
+              </a>
+            </div>
+            <div className="image-container">
+              <img src={resultUrl} alt="Ilustración generada" />
+            </div>
+          </div>
+
+          {brandRefs.length > 0 && (
+            <div className="references-card">
+              <h3>References</h3>
+              <div className="ref-grid">
+                {brandRefs.map((ref, index) => (
+                  <div key={index} className="ref-item">
+                    <img src={ref.url} alt={ref.title} />
+                    <p className="ref-title">{ref.title}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="result-right">
+          <div className="personalization-card">
+            <h3>Personalization</h3>
+            <div className="option-buttons">
+              <button
+                onClick={() => {
+                  setShowColorOptions(!showColorOptions);
+                  setShowChatBox(false);
+                  setShowTitleOptions(false);
+                }}
+                disabled={isGenerating}
+                className="option-btn"
+              >
+                <div className="option-icon color-icon"></div>
+                <div className="option-text">
+                  <p className="option-title">Change Colors</p>
+                  <p className="option-subtitle">ING palettes</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowTitleOptions(!showTitleOptions);
+                  setShowColorOptions(false);
+                  setShowChatBox(false);
+                }}
+                disabled={isGenerating}
+                className="option-btn"
+              >
+                <div className="option-icon title-icon">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                  </svg>
+                </div>
+                <div className="option-text">
+                  <p className="option-title">Add Title</p>
+                  <p className="option-subtitle">Custom text</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowChatBox(!showChatBox);
+                  setShowColorOptions(false);
+                  setShowTitleOptions(false);
+                }}
+                disabled={isGenerating}
+                className="option-btn"
+              >
+                <div className="option-icon chat-icon">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <div className="option-text">
+                  <p className="option-title">Modify with AI</p>
+                  <p className="option-subtitle">Custom instructions</p>
+                </div>
+              </button>
+            </div>
+
+            {showColorOptions && <ColorPalettesMenu />}
+            {showTitleOptions && <TitleOptionsMenu />}
+            {showChatBox && <ModifyAIMenu />}
+          </div>
+
+          <div className="actions-card">
+            <h3>Actions</h3>
+            <button
+              onClick={generate}
+              disabled={isGenerating}
+              className="regenerate-btn"
+            >
+              Regenerate Image
+            </button>
+          </div>
+
+          {isGenerating && (
+            <div className="loading-card">
+              <div className="loading-spinner"></div>
+              <div className="loading-text">
+                <span className="loading-title">Processing…</span>
+                <p className="loading-subtitle">Applying changes, please wait.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ), [resultUrl, brandRefs, isGenerating, showColorOptions, showTitleOptions, showChatBox, generate, ColorPalettesMenu, TitleOptionsMenu, ModifyAIMenu]);
+
   if (currentScreen === "welcome") return <WelcomeScreen />;
   if (currentScreen === "capture") return <CaptureScreen />;
   if (currentScreen === "generating") return <GeneratingScreen />;
