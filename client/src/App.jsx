@@ -271,13 +271,13 @@ const CaptureScreen = () => (
 
   // --- Pantalla Resultado + Personalización (Iteration) ---
   const ResultScreen = () => (
-    <div style={
+    <div style={{
       display: "flex",
       minHeight: "100vh",
       backgroundColor: "#F7F7F7",
       padding: "2rem",
       gap: "2rem"
-    }>
+    }}>
       <Header />
 
       {/* IZQUIERDA: imagen y refs */}
@@ -585,15 +585,15 @@ const CaptureScreen = () => (
           )}
 
           {/* Sub-menú Modify AI */}
- {showChatBox && (
+
+{showChatBox && (
   <div style={{
     marginTop: "1rem",
     background: "#F7F7F7",
     borderRadius: "1rem",
     padding: "1rem"
   }}>
-    <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}>
-      Modify with AI
+    <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}> Modify with AI
     </p>
     {/* sólo actualiza chatText en el state, sin lanzar la iteración hasta pulsar Apply */}
     <textarea
