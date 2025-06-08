@@ -125,12 +125,6 @@ export default function App() {
     }
   }, [responseId, imageCallId, originalDescription, prevImageUrl]);
 
-  const closeAllSubmenus = useCallback(() => {
-    setShowColorOptions(false);
-    setShowChatBox(false);
-    setShowTitleOptions(false);
-  }, []);
-
   const handleNavigation = useCallback((screen) => {
     if (screen === "result" && !resultUrl) {
       alert("Primero genera una imagen");
@@ -138,6 +132,16 @@ export default function App() {
     }
     setCurrentScreen(screen);
   }, [resultUrl]);
+
+  const handleChatTextChange = useCallback((e) => {
+    setChatText(e.target.value);
+  }, []);
+
+  const handleChatSubmit = useCallback(() => {
+    iterate("chat", chatText);
+    setShowChatBox(false);
+    setChatText("");
+  }, [iterate, chatText]);
 
   const Header = useMemo(() => () => (
     <div className="header">
@@ -320,16 +324,6 @@ export default function App() {
     </div>
   ), [iterate, isGenerating]);
 
-  const handleChatTextChange = useCallback((e) => {
-    setChatText(e.target.value);
-  }, []);
-
-  const handleChatSubmit = useCallback(() => {
-    iterate("chat", chatText);
-    setShowChatBox(false);
-    setChatText("");
-  }, [iterate, chatText]);
-
   const ResultScreen = useCallback(() => (
     <div className="result-container">
       <Header />
@@ -478,7 +472,7 @@ export default function App() {
         </div>
       </div>
     </div>
-  ), [resultUrl, brandRefs, isGenerating, showColorOptions, showTitleOptions, showChatBox, generate, ColorPalettesMenu, TitleOptionsMenu, ModifyAIMenu]);
+  ), [resultUrl, brandRefs, isGenerating, showColorOptions, showTitleOptions, showChatBox, chatText, generate, ColorPalettesMenu, TitleOptionsMenu, handleChatTextChange, handleChatSubmit]);
 
   if (currentScreen === "welcome") return <WelcomeScreen />;
   if (currentScreen === "capture") return <CaptureScreen />;
