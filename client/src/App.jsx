@@ -1,6 +1,52 @@
 import { useState, useCallback, useMemo } from "react";
 import "./styles.css";
 
+// Componente separado para el textarea que mantiene su propio estado
+const ModifyAITextarea = ({ onSubmit, isGenerating }) => {
+  const [localText, setLocalText] = useState("");
+
+  const handleSubmit = () => {
+    if (localText.trim()) {
+      onSubmit(localText);
+      setLocalText(""); // Limpiar después de enviar
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  return (
+    <div className="submenu">
+      <p className="submenu-title">Modify with AI</p>
+      <textarea
+        rows={3}
+        maxLength={250}
+        placeholder="Describe the changes you want to apply…"
+        value={localText}
+        onChange={(e) => setLocalText(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={isGenerating}
+        className="ai-textarea"
+        autoFocus
+      />
+      <div className="textarea-footer">
+        <span className="char-count">{localText.length}/250 chars</span>
+        <button
+          onClick={handleSubmit}
+          disabled={isGenerating || !localText.trim()}
+          className="apply-btn"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [captured, setCaptured] = useState(null);
   const [resultUrl, setResultUrl] = useState(null);
@@ -14,7 +60,6 @@ export default function App() {
   const [showColorOptions, setShowColorOptions] = useState(false);
   const [showChatBox, setShowChatBox] = useState(false);
   const [showTitleOptions, setShowTitleOptions] = useState(false);
-  const [chatText, setChatText] = useState("");
   const [currentScreen, setCurrentScreen] = useState("welcome");
 
   const resetApp = useCallback(() => {
@@ -28,7 +73,6 @@ export default function App() {
     setShowColorOptions(false);
     setShowChatBox(false);
     setShowTitleOptions(false);
-    setChatText("");
     setCurrentScreen("welcome");
   }, []);
 
@@ -116,7 +160,6 @@ export default function App() {
       setShowColorOptions(false);
       setShowChatBox(false);
       setShowTitleOptions(false);
-      setChatText("");
     } catch (err) {
       console.error("iterate error:", err);
       alert("Error en iteración: " + err.message);
@@ -133,15 +176,10 @@ export default function App() {
     setCurrentScreen(screen);
   }, [resultUrl]);
 
-  const handleChatTextChange = useCallback((e) => {
-    setChatText(e.target.value);
-  }, []);
-
-  const handleChatSubmit = useCallback(() => {
+  const handleChatSubmit = useCallback((chatText) => {
     iterate("chat", chatText);
     setShowChatBox(false);
-    setChatText("");
-  }, [iterate, chatText]);
+  }, [iterate]);
 
   const Header = useMemo(() => () => (
     <div className="header">
@@ -421,30 +459,10 @@ export default function App() {
             {showColorOptions && <ColorPalettesMenu />}
             {showTitleOptions && <TitleOptionsMenu />}
             {showChatBox && (
-              <div className="submenu">
-                <p className="submenu-title">Modify with AI</p>
-                <textarea
-                  key="ai-textarea"
-                  rows={3}
-                  maxLength={250}
-                  placeholder="Describe the changes you want to apply…"
-                  value={chatText}
-                  onChange={handleChatTextChange}
-                  disabled={isGenerating}
-                  className="ai-textarea"
-                  autoFocus
-                />
-                <div className="textarea-footer">
-                  <span className="char-count">{chatText.length}/250 chars</span>
-                  <button
-                    onClick={handleChatSubmit}
-                    disabled={isGenerating || !chatText.trim()}
-                    className="apply-btn"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
+              <ModifyAITextarea 
+                onSubmit={handleChatSubmit}
+                isGenerating={isGenerating}
+              />
             )}
           </div>
 
