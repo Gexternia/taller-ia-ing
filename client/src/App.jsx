@@ -237,7 +237,7 @@ const CaptureScreen = () => (
           />
         </label>
       </div>
-
+      
       {/* Preview */}
       {captured && (
         <div className="preview-box">
@@ -259,9 +259,6 @@ const CaptureScreen = () => (
     </div>
   </div>
 );
-
-
-
   // --- Generating (pantalla intermedia, sin cambios) ---
   const GeneratingScreen = () => (
     <div className="generating-container">
@@ -274,13 +271,13 @@ const CaptureScreen = () => (
 
   // --- Pantalla Resultado + Personalización (Iteration) ---
   const ResultScreen = () => (
-    <div style={{
+    <div style={
       display: "flex",
       minHeight: "100vh",
       backgroundColor: "#F7F7F7",
       padding: "2rem",
       gap: "2rem"
-    }}>
+    }>
       <Header />
 
       {/* IZQUIERDA: imagen y refs */}
@@ -588,7 +585,7 @@ const CaptureScreen = () => (
           )}
 
           {/* Sub-menú Modify AI */}
-{showChatBox && (
+ {showChatBox && (
   <div style={{
     marginTop: "1rem",
     background: "#F7F7F7",
@@ -598,12 +595,13 @@ const CaptureScreen = () => (
     <p style={{ fontWeight: 600, color: "#333333", marginBottom: "0.5rem" }}>
       Modify with AI
     </p>
+    {/* sólo actualiza chatText en el state, sin lanzar la iteración hasta pulsar Apply */}
     <textarea
       rows={3}
       maxLength={250}
       placeholder="Describe the changes you want to apply…"
       value={chatText}
-      onChange={e => setChatText(e.target.value)}  {/* sólo actualiza chatText */}
+      onChange={e => setChatText(e.target.value)}
       disabled={isGenerating}
       style={{
         width: "100%",
@@ -621,7 +619,7 @@ const CaptureScreen = () => (
       </span>
       <button
         onClick={() => {
-          iterate("chat", chatText);      // aquí sí lanzamos la iteración
+          iterate("chat", chatText);
           setShowChatBox(false);
           setChatText("");
         }}
@@ -640,8 +638,6 @@ const CaptureScreen = () => (
     </div>
   </div>
 )}
-
-          )}
         </div>
         {/* Botón Regenerar */}
         <div style={{
