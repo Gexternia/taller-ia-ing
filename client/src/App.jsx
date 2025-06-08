@@ -321,7 +321,7 @@ export default function App() {
     </div>
   ), [iterate, isGenerating]);
 
-  const ResultScreen = useCallback(() => (
+  const ResultScreen = () => (
     <div className="result-container">
       <Header />
       <div className="result-content">
@@ -424,6 +424,7 @@ export default function App() {
               <div className="submenu">
                 <p className="submenu-title">Modify with AI</p>
                 <textarea
+                  key="ai-textarea"
                   rows={3}
                   maxLength={250}
                   placeholder="Describe the changes you want to apply…"
@@ -431,6 +432,7 @@ export default function App() {
                   onChange={handleChatTextChange}
                   disabled={isGenerating}
                   className="ai-textarea"
+                  autoFocus
                 />
                 <div className="textarea-footer">
                   <span className="char-count">{chatText.length}/250 chars</span>
@@ -469,7 +471,7 @@ export default function App() {
         </div>
       </div>
     </div>
-  ), [resultUrl, brandRefs, isGenerating, showColorOptions, showTitleOptions, showChatBox, chatText, generate, ColorPalettesMenu, TitleOptionsMenu, handleChatTextChange, handleChatSubmit]);
+  );
 
   if (currentScreen === "welcome") return <WelcomeScreen />;
   if (currentScreen === "capture") return <CaptureScreen />;
