@@ -1,55 +1,4 @@
-  .regenerate-btn {
-  background: linear-gradient(135deg, #FF6200 0%, #FF8A00 100%);
-  color: #ffffff;
-  width: 100%;
-  padding: 1.25rem;
-  border-radius: 1.5rem;
-  font-weight: 700;
-  font-size: 1.15rem;
-  transition: all 0.3s ease;
-  border: none;
-  box-shadow: 0 8px 25px rgba(255, 98, 0, 0.3);
-  letter-spacing: -0.01em;
-  position: relative;
-  overflow: hidden;
-}
-
-.regenerate-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s ease;
-}
-
-.regenerate-btn:hover::before {
-  left: 100%;
-}
-
-.regenerate-btn:hover:not(:disabled) {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 15px 40px rgba(255, 98, 0, 0.4);
-}
-
-.regenerate-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-.loading-card {
-  background: linear-gradient(135deg, #FFF9E6 0%, #FFF3C4 100%);
-  border-radius: 1.5rem;
-  box-shadow: 0 8px 25px rgba(255, 193, 7, 0.25);
-  padding: 2rem;
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  animation: pulse /* === 1) FUENTE === */
+  /* === 1) FUENTE === */
 @font-face {
   font-family: 'INGdisplay-Bold';
   src: url('/fonts/INGdisplay-Bold.woff2') format('woff2'),
@@ -177,6 +126,26 @@ img {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
 
 .spinner {
@@ -993,22 +962,40 @@ img {
   cursor: not-allowed;
 }
 
- .regenerate-btn {
-  background: linear-gradient(135deg, #FF6200 0%, #e55500 100%);
+.regenerate-btn {
+  background: linear-gradient(135deg, #FF6200 0%, #FF8A00 100%);
   color: #ffffff;
   width: 100%;
-  padding: 1rem;
-  border-radius: 1rem;
-  font-weight: 600;
-  font-size: 1.1rem;
-  transition: all 0.2s ease;
+  padding: 1.25rem;
+  border-radius: 1.5rem;
+  font-weight: 700;
+  font-size: 1.15rem;
+  transition: all 0.3s ease;
   border: none;
-  box-shadow: 0 4px 12px rgba(255, 98, 0, 0.3);
+  box-shadow: 0 8px 25px rgba(255, 98, 0, 0.3);
+  letter-spacing: -0.01em;
+  position: relative;
+  overflow: hidden;
+}
+
+.regenerate-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+.regenerate-btn:hover::before {
+  left: 100%;
 }
 
 .regenerate-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(255, 98, 0, 0.4);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 15px 40px rgba(255, 98, 0, 0.4);
 }
 
 .regenerate-btn:disabled {
@@ -1072,28 +1059,7 @@ img {
   font-weight: 500;
 }
 
-/* === 11) ANIMACIONES ADICIONALES === */
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(50px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes shimmer {
-  0% { left: -100%; }
-  100% { left: 100%; }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-}
-
-/* === 12) MICRO-INTERACCIONES === */
+/* === 11) MICRO-INTERACCIONES === */
 .option-btn:active {
   transform: translateY(-1px) scale(0.98);
 }
@@ -1106,7 +1072,7 @@ img {
   transform: translateY(-1px) scale(0.98);
 }
 
-/* === 11) RESPONSIVE DESIGN === */
+/* === 12) RESPONSIVE DESIGN === */
 @media (max-width: 1024px) {
   .result-content {
     flex-direction: column;
