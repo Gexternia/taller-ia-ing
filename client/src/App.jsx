@@ -358,6 +358,26 @@ export default function App() {
     </div>
   ), [iterate, isGenerating]);
 
+  const handleDownload = useCallback(async () => {
+    if (!resultUrl) return;
+    
+    try {
+      const response = await fetch(resultUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ilustracion_ing_${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      alert('Error al descargar la imagen. Por favor, inténtalo de nuevo.');
+    }
+  }, [resultUrl]);
+
   const ResultScreen = () => (
     <div className="result-container">
       <Header />
@@ -366,13 +386,13 @@ export default function App() {
           <div className="result-image-card">
             <div className="card-header">
               <h2>Your ING Illustration</h2>
-              <a
-                href={resultUrl}
-                download="ilustracion_ing.png"
+              <button
+                onClick={handleDownload}
                 className="download-btn"
+                disabled={!resultUrl}
               >
                 Download
-              </a>
+              </button>
             </div>
             <div className="image-container">
               <img src={resultUrl} alt="Ilustración generada" />
