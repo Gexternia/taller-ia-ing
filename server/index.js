@@ -513,6 +513,41 @@ Client’s raw instruction:
   }
 });
 
+// Nuevo endpoint para descargas seguras
+app.get("/api/download-image", async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).json({ error: "URL parameter is required" });
+    }
+
+    // Verificar que la URL sea de nuestro bucket S3
+    if (!url.includes(OUTPUT_CFG.bucket)) {
+      return res.status(400).json({ error: "Invalid URL" });
+    }
+
+    // Descargar la imagen desde S3
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to fetch image from S3");
+    }
+
+    const buffer = await response.arrayBuffer();
+    const filename = `ilustracion_ing_${Date.now()}.png`;
+
+    // Configurar headers para forzar descarga
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.byteLength);
+    
+    // Enviar el archivo
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("❌ Download error:", error);
+    res.status(500).json({ error: "Failed to download image" });
+  }
+});
+
 // No ruta de descarga directa; el cliente debe usar el signed URL de resultUrl
 app.get("/api/download/:file", (_req, res) =>
   res.status(404).send("Use the signed URL in resultUrl")

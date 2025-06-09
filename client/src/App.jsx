@@ -362,16 +362,17 @@ export default function App() {
     if (!resultUrl) return;
     
     try {
-      const response = await fetch(resultUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      // Usar nuestro endpoint de descarga
+      const downloadUrl = `/api/download-image?url=${encodeURIComponent(resultUrl)}`;
+      
+      // Crear enlace temporal para descarga
       const link = document.createElement('a');
-      link.href = url;
+      link.href = downloadUrl;
       link.download = `ilustracion_ing_${Date.now()}.png`;
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading image:', error);
       alert('Error al descargar la imagen. Por favor, inténtalo de nuevo.');
