@@ -1,14 +1,13 @@
 import { useState, useCallback, useMemo } from "react";
 import "./styles.css";
 
-// Componente separado para el textarea que mantiene su propio estado
 const ModifyAITextarea = ({ onSubmit, isGenerating }) => {
   const [localText, setLocalText] = useState("");
 
   const handleSubmit = () => {
     if (localText.trim()) {
       onSubmit(localText);
-      setLocalText(""); // Limpiar después de enviar
+      setLocalText("");
     }
   };
 
@@ -222,12 +221,12 @@ export default function App() {
       <div className="welcome-content">
         <div className="welcome-left">
           <h1>
-            Your strategy.<br />
-            Your style.<br />
-            Your illustration.
+            Our strategy.<br />
+            Our style.<br />
+            Our design.
           </h1>
           <p>
-            Transform your ideas into professional illustrations with AI & ING style.
+            Transform your ideas into ING illustrations with AI.
           </p>
           <button
             className="btn-primary"
@@ -251,8 +250,8 @@ export default function App() {
         <div className="capture-left">
           <div className="capture-info">
             <h2>
-              Take a photo.<br />
-              Transform your strategy.
+              Let's design together<br />
+              the ING strategy.
             </h2>
             <p>
               Take a photo or upload your sketch to generate an ING-style illustration.

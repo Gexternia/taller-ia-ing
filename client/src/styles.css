@@ -1,4 +1,4 @@
-  /* === 1) FUENTE === */
+/* === 1) FUENTE === */
 @font-face {
   font-family: 'INGdisplay-Bold';
   src: url('/fonts/INGdisplay-Bold.woff2') format('woff2'),
@@ -292,22 +292,10 @@ img {
   align-items: center;
   text-align: center;
   padding: 4rem 2rem;
-  background: linear-gradient(135deg, #FF6200 0%, #FF8A00 100%);
+  background: #FF6200;
   color: white;
   position: relative;
   z-index: 2;
-}
-
-.capture-info::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: url('/images/foto2.jpg') center/cover;
-  opacity: 0.1;
-  z-index: -1;
 }
 
 .capture-info h2 {
