@@ -135,10 +135,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 - **Relojes derretidos** o referencias a objetos surrealistas.`;
           break;
         case "diego velazquez":
-          promptText = `Transforma esta imagen en una obra al estilo de Diego Velázquez:
-- **Realismo barroco**: Usa luz y sombra para dar profundidad.
-- **Retrato detallado** con atención a la textura de la piel y ropa.
-- **Composición sobria y elegante**.`;
+          promptText = `Convierte esta imagen en una pintura al estilo de Diego Velázquez: aplica realismo detallado, iluminación barroca, fondos sobrios y retratos psicológicos. Usa colores tenues y realza la dignidad y humanidad de los personajes, inspirándote en obras como “Las Meninas” y retratos de la corte española.`;
           break;
         case "joaquin sorolla":
           promptText = `Transforma esta imagen en una obra al estilo de Joaquín Sorolla:
