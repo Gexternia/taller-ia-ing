@@ -104,7 +104,7 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
     const validArtists = [
       "picasso",
       "salvador dali",
-      "diego velazquez",
+      // "diego velazquez",
       "joaquin sorolla",
     ];
 
@@ -134,9 +134,9 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 - **Colores vivos** y detalles realistas con formas imposibles o fantásticas.
 - **Relojes derretidos** o referencias a objetos surrealistas.`;
           break;
-        case "diego velazquez":
-          promptText = `Transform this image into a painting in the style of Diego Velázquez. Use detailed realism, dramatic Baroque lighting, and a rich, atmospheric background inspired by Velázquez’s masterpieces. The scene must include a dark, elegant, and subtle background, emphasizing depth and the painter’s classic mood.`;
-          break;
+        // case "diego velazquez":
+        //   promptText = `Transform this image into a painting in the style of Diego Velázquez. Use detailed realism, dramatic Baroque lighting, and a rich, atmospheric background inspired by Velázquez’s masterpieces. The scene must include a dark, elegant, and subtle background, emphasizing depth and the painter’s classic mood.`;
+        //   break;
         case "joaquin sorolla":
           promptText = `Transforma esta imagen en una obra al estilo de Joaquín Sorolla:
 - **Impresionismo español**: Utiliza pinceladas sueltas y luminosas.

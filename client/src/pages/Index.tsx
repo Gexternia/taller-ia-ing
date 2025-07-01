@@ -86,7 +86,7 @@ const Index = () => {
   const painterOptions = [
     { key: "picasso", label: "Arte Picasso" },
     { key: "salvador dali", label: "Arte Dalí" },
-    { key: "diego velazquez", label: "Arte Velázquez" },
+    // { key: "diego velazquez", label: "Arte Velázquez" },
     { key: "joaquin sorolla", label: "Arte Sorolla" },
   ];
   const painterRefs = {
@@ -98,10 +98,10 @@ const Index = () => {
       label: "Arte Dalí",
       img: "./dali.png",
     },
-    "diego velazquez": {
-      label: "Arte Velázquez",
-      img: "./Velazquez.png",
-    },
+    // "diego velazquez": {
+    //   label: "Arte Velázquez",
+    //   img: "./Velazquez.png",
+    // },
     "joaquin sorolla": {
       label: "Arte Sorolla",
       img: "./Sorolla.png",
