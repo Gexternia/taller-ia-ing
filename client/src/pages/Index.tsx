@@ -253,16 +253,18 @@ const Index = () => {
   }, [resultUrl]);
 
   const Header = useMemo(
-    () => () =>
-      (
+    () => () => {
+      const [open, setOpen] = useState(false);
+
+      return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto flex items-center justify-between px-3 py-2 md:px-6">
             <div
-              className="flex items-center space-x-2 cursor-pointer"
+              className="flex items-center gap-2 cursor-pointer"
               onClick={resetApp}
             >
               <img
-                src="/Externia.jpeg" // o "/logo.png"
+                src="/Externia.jpeg"
                 alt="Logo"
                 className="w-10 h-10 object-contain"
               />
@@ -271,18 +273,50 @@ const Index = () => {
               </span>
             </div>
 
-            <nav className="flex items-center space-x-2">
+            {/* Hamburguesa visible sólo en móvil */}
+            <button
+              className="md:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-purple-400"
+              onClick={() => setOpen((v) => !v)}
+              aria-label="Abrir menú"
+              type="button"
+            >
+              <svg
+                className="w-7 h-7 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d={open ? "M6 18L18 6M6 6l12 12" : "M4 8h16M4 16h16"}
+                />
+              </svg>
+            </button>
+
+            {/* Menú horizontal en desktop, vertical flotante en móvil */}
+            <nav
+              className={`
+                flex-col md:flex-row md:flex items-center md:space-x-2
+                absolute md:static bg-white/95 md:bg-transparent left-0 right-0 top-16 md:top-0 shadow-md md:shadow-none transition-all z-40
+                ${open ? "flex" : "hidden md:flex"}
+              `}
+            >
               <Button
                 variant={currentScreen === "welcome" ? "default" : "ghost"}
-                onClick={() => setCurrentScreen("welcome")}
+                onClick={() => {
+                  setCurrentScreen("welcome");
+                  setOpen(false);
+                }}
                 className={
                   currentScreen === "welcome"
                     ? "bg-gradient-to-r from-orange-400 to-pink-500"
-                    : ""
+                    : "md:bg-none w-full md:w-auto"
                 }
               >
                 <Home className="w-4 h-4 mr-2" />
-                Home
+                <span>Home</span>
               </Button>
               <Button
                 variant={
@@ -294,11 +328,12 @@ const Index = () => {
                   setMode("pintor");
                   setArtist("");
                   setCurrentScreen("capture");
+                  setOpen(false);
                 }}
                 className={
                   currentScreen === "capture" && mode === "pintor"
                     ? "bg-gradient-to-r from-orange-400 to-purple-500 text-white font-medium"
-                    : ""
+                    : "md:bg-none w-full md:w-auto"
                 }
               >
                 <span
@@ -311,7 +346,6 @@ const Index = () => {
                   Pintor
                 </span>
               </Button>
-
               <Button
                 variant={
                   currentScreen === "capture" && mode === "caricature"
@@ -321,11 +355,12 @@ const Index = () => {
                 onClick={() => {
                   setMode("caricature");
                   setCurrentScreen("capture");
+                  setOpen(false);
                 }}
                 className={
                   currentScreen === "capture" && mode === "caricature"
-                    ? "bg-gradient-to-r from-green-500 to-blue-500"
-                    : "text-gray-600"
+                    ? "bg-gradient-to-r from-green-500 to-blue-500 text-white font-medium"
+                    : "md:bg-none w-full md:w-auto"
                 }
               >
                 <span
@@ -341,8 +376,9 @@ const Index = () => {
             </nav>
           </div>
         </header>
-      ),
-    [currentScreen, resetApp, mode]
+      );
+    },
+    [currentScreen, resetApp, mode, setCurrentScreen, setMode, setArtist]
   );
 
   const WelcomeScreen = useCallback(
@@ -559,10 +595,10 @@ const Index = () => {
                           />
                           <label
                             htmlFor="file-upload"
-                            className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors"
+                            className="inline-flex items-center px-6 py-3 ..."
                           >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Cambiar imagen
+                            <Camera className="w-5 h-5 mr-2" />
+                            Tomar foto / Subir
                           </label>
                         </div>
                       ) : (
@@ -597,7 +633,6 @@ const Index = () => {
                         id="file-upload"
                         type="file"
                         accept="image/*"
-                        capture="environment"
                         onChange={(e) => setCaptured(e.target.files[0])}
                         className="hidden"
                         disabled={isGenerating}
