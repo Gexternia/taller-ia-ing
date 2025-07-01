@@ -135,7 +135,8 @@ app.post("/api/generate", upload.single("image"), async (req, res) => {
 - **Relojes derretidos** o referencias a objetos surrealistas.`;
           break;
         case "diego velazquez":
-          promptText = `Convierte esta imagen en una pintura al estilo de Diego Velázquez: aplica realismo detallado, iluminación barroca, fondos sobrios y retratos psicológicos. Usa colores tenues y realza la dignidad y humanidad de los personajes, inspirándote en obras como “Las Meninas” y retratos de la corte española. Si la imagen ya tiene fondo, transfórmalo siguiendo el estilo de Velázquez; si no tiene fondo o es neutro, añade un fondo oscuro característico del pintor, como en sus retratos clásicos.`;
+          promptText = `Transform this image into a painting in the style of Diego Velázquez. Apply detailed realism, dramatic Baroque lighting, subdued backgrounds, and psychological depth in the portraits. Use muted colors, emphasizing the dignity and humanity of the subjects, drawing inspiration from masterpieces such as “Las Meninas” and Velázquez’s Spanish court portraits.
+Regardless of the original image, ensure that every final artwork includes a background inspired by Velázquez’s paintings. If the image already has a background, reimagine it in Velázquez’s style—rich, subtle, and atmospheric. If the image lacks a background or features a neutral one, add a dark, elegant backdrop reminiscent of his classic portraits. The final result should capture the spirit, lighting, and ambiance characteristic of Velázquez’s greatest works.`;
           break;
         case "joaquin sorolla":
           promptText = `Transforma esta imagen en una obra al estilo de Joaquín Sorolla:
